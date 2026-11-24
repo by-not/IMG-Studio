@@ -25,6 +25,12 @@ int run_cli_main(int argc, char** argv) {
             opts.initial_dff = imgstudio::platform::from_utf8(argv[++i]);
         } else if (arg == "--txd" && i + 1 < argc) {
             opts.initial_txd = imgstudio::platform::from_utf8(argv[++i]);
+        } else if (arg == "--lang" && i + 1 < argc) {
+            opts.initial_language = argv[++i];
+        } else if (arg == "--settings-file" && i + 1 < argc) {
+            opts.settings_file_override = imgstudio::platform::from_utf8(argv[++i]);
+        } else if (arg == "--save-lang") {
+            opts.save_language_override = true;
         } else if (arg == "--smoke-test-out" && i + 1 < argc) {
             opts.smoke_test_report_path = imgstudio::platform::from_utf8(argv[++i]);
         } else if (!arg.empty() && arg[0] != '-' && !opts.initial_archive.has_value()) {

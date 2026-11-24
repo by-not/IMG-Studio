@@ -1,0 +1,65 @@
+name: Bug Report
+description: Report a crash, archive issue, rendering bug, or localization error in IMG Studio
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Do not attach copyrighted game archives (.img, .dff, .txd from commercial GTA installations).
+  - type: input
+    id: version
+    attributes:
+      label: IMG Studio Version
+      description: Found in Help -> About IMG Studio or the release zip filename
+      placeholder: "e.g. 2.1.0 (win64)"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System & GPU
+      options:
+        - Windows 11 (x64)
+        - Windows 10 (x64)
+        - Linux / WSL2 (dev/test build)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Workspace / Module
+      options:
+        - Archive Explorer (IMG VER2)
+        - DFF Studio (3D Viewer)
+        - TXD Studio (Textures)
+        - IMG Compare
+        - Batch Processing
+        - Localization / UI Layout
+        - Build / Packaging
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Clear numbered steps starting from opening IMG Studio
+      placeholder: |
+        1. Open Archive Explorer with a test archive...
+        2. Switch workspace or run action...
+        3. Observe error...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs Actual Behavior
+      description: Describe what should happen and what actually happened
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Validation / Error Output
+      description: Paste any validation JSON, smoke-test log, or toast error text here
+      render: text

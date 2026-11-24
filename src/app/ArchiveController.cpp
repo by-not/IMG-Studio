@@ -6,8 +6,10 @@
 
 namespace imgstudio::app {
 
-ArchiveController::ArchiveController()
-    : settings_path_(platform::get_system_paths().settings_file)
+ArchiveController::ArchiveController(std::optional<std::filesystem::path> settings_override)
+    : settings_path_(settings_override.has_value() && !settings_override->empty()
+                         ? *settings_override
+                         : platform::get_system_paths().settings_file)
     , backup_manager_(platform::get_system_paths().default_backup_dir) {
     settings_ = AppSettingsStore::load_or_default(settings_path_);
     if (!settings_.backup_directory.empty()) {

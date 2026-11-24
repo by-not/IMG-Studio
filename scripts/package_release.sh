@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="2.0.0"
+VERSION="2.1.0"
 PKG_NAME="IMGStudio-${VERSION}-win64"
 DIST_ROOT="${ROOT_DIR}/dist"
 STAGE_DIR="${DIST_ROOT}/${PKG_NAME}"
@@ -20,10 +20,11 @@ mkdir -p "${STAGE_DIR}"
 cp "${BUILD_DIR}/IMGStudio.exe" "${STAGE_DIR}/IMGStudio.exe"
 cp -R "${ROOT_DIR}/assets" "${STAGE_DIR}/assets"
 cp "${ROOT_DIR}/README.md" "${STAGE_DIR}/README.md"
+cp "${ROOT_DIR}/README.es.md" "${STAGE_DIR}/README.es.md"
 cp "${ROOT_DIR}/LICENSE" "${STAGE_DIR}/LICENSE"
 
 cat > "${STAGE_DIR}/THIRD_PARTY_LICENSES.txt" <<'EOF'
-IMG Studio 2.0 - Third-Party Software and Font Notices
+IMG Studio 2.1 - Third-Party Software and Font Notices
 =======================================================
 
 1. Dear ImGui (v1.91.9b-docking)
@@ -57,16 +58,16 @@ IMG Studio 2.0 - Third-Party Software and Font Notices
 EOF
 
 cat > "${STAGE_DIR}/RELEASE_NOTES.md" <<'EOF'
-# IMG Studio 2.0.0 — Windows x64 Release
+# IMG Studio 2.1.0 — Windows x64 Release
 
-Native Windows x64 application for GTA San Andreas IMG VER2 archives, RenderWare DFF 3D models, TXD texture dictionaries, archive comparison, and batch processing.
+Native Windows x64 application for GTA San Andreas IMG VER2 archives, RenderWare DFF 3D models, TXD texture dictionaries, archive comparison, batch processing, and live UI localization (`en` / `es`).
 
 ## Contents
 
 - `IMGStudio.exe` — Standalone Windows x64 executable (static C++/pthread runtime; standard Windows system DLLs only).
-- `assets/` — Application fonts (Inter, JetBrains Mono, Font Awesome 6 Free) and icon assets. Keep this folder next to `IMGStudio.exe`.
-- `README.md` — Feature overview, quick start, and documentation index.
-- `LICENSE` — MIT License for IMG Studio.
+- `assets/` — Application fonts (Inter, JetBrains Mono, Font Awesome 6 Free), icon assets, and UTF-8 JSON locales (`assets/locales/en.json`, `es.json`, `template.json`). Keep this folder next to `IMGStudio.exe`.
+- `README.md` & `README.es.md` — Bilingual feature overview, quick start, and documentation index.
+- `LICENSE` — Project license file (confirm final owner selection before public release).
 - `THIRD_PARTY_LICENSES.txt` — Licenses for bundled libraries and fonts.
 
 ## System Requirements
@@ -79,6 +80,7 @@ Native Windows x64 application for GTA San Andreas IMG VER2 archives, RenderWare
 - Archive Explorer edits remain staged in memory until **Rebuild & Save** (`Ctrl+S`), with automatic pre-commit backups enabled by default.
 - DFF Studio and TXD Studio inspect entries directly from opened IMG archives in memory without modifying source archives.
 - IMG Compare is strictly read-only. Batch modifying operations (`Import`, `Replace Matching`) create automatic backups by default before atomic rebuilds.
+- Language preference (`Auto`, `English`, `Español`, or community locales placed in `assets/locales/`) switches live in **File -> Settings** and persists across restarts.
 EOF
 
 echo "=== Creating ZIP archive: ${ZIP_PATH} ==="

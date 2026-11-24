@@ -29,6 +29,7 @@ struct AppSettings {
     bool show_inspector = true;
     std::vector<std::filesystem::path> recent_files;
     std::size_t max_recent_files = 15U;
+    std::string language = "auto";
 
     void add_recent_file(const std::filesystem::path& path);
 };

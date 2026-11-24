@@ -1,7 +1,9 @@
 #include "ui/InspectorPanel.hpp"
+#include "app/Localization.hpp"
 #include "core/ImgFilename.hpp"
 #include "platform/FileDialogs.hpp"
 #include "platform/Platform.hpp"
+#include "ui/ExplorerTable.hpp"
 #include "ui/Icons.hpp"
 
 #include <imgui.h>
@@ -14,6 +16,17 @@
 namespace imgstudio::ui {
 
 namespace {
+
+const char* localized_change_state(app::EntryChangeState st) {
+    switch (st) {
+        case app::EntryChangeState::Unchanged: return app::tr_c("explorer.status.clean");
+        case app::EntryChangeState::Imported: return app::tr_c("explorer.status.added");
+        case app::EntryChangeState::Replaced: return app::tr_c("explorer.status.replaced");
+        case app::EntryChangeState::Renamed: return app::tr_c("explorer.status.renamed");
+        case app::EntryChangeState::Deleted: return app::tr_c("explorer.status.deleted");
+    }
+    return app::tr_c("explorer.status.clean");
+}
 
 void property_row(const char* label, const std::string& value, ImFont* mono_font = nullptr) {
     ImGui::TableNextRow();
@@ -31,7 +44,7 @@ void export_validation_report_json(
     UiState& state) {
     auto dest = platform::save_file_dialog(
         native_hwnd,
-        "Export Validation Report",
+        app::tr("dialog.export_val.title"),
         doc.path().stem().string() + "_validation.json",
         {{"JSON Files (*.json)", "*.json"}, {"All Files (*.*)", "*.*"}});
     if (!dest.has_value()) {
@@ -66,11 +79,11 @@ void export_validation_report_json(
 
     std::ofstream out(*dest, std::ios::binary | std::ios::trunc);
     if (!out.is_open()) {
-        state.push_toast("Export failed", "Could not write validation JSON report.", true);
+        state.push_toast(app::tr("toast.export_val_failed"), app::tr("toast.export_val_failed_detail"), true);
         return;
     }
     out << j.dump(2) << '\n';
-    state.push_toast("Validation report exported", platform::to_utf8(dest->filename()));
+    state.push_toast(app::tr("toast.export_val_ok"), platform::to_utf8(dest->filename()));
 }
 
 } // namespace
@@ -88,55 +101,73 @@ void render_inspector_panel(
     }
 
     // 1. Properties tab
-    if (ImGui::BeginTabItem("Properties")) {
+    if (ImGui::BeginTabItem((app::tr("inspector.tab.properties") + "###InspProps").c_str())) {
         if (!doc || !state.primary_selected_id.has_value()) {
             ImGui::Spacing();
-            ImGui::TextDisabled("Select an entry in the explorer to inspect its VER2 metadata.");
+            ImGui::TextDisabled("%s", app::tr_c("inspector.select_prompt"));
         } else {
             const auto* e = doc->find_by_id(*state.primary_selected_id);
             if (!e) {
-                ImGui::TextDisabled("Entry no longer exists.");
+                ImGui::TextDisabled("%s", app::tr_c("inspector.entry_missing"));
             } else {
                 if (fonts.semibold) ImGui::PushFont(fonts.semibold);
                 ImGui::TextWrapped("%s", e->name.c_str());
                 if (fonts.semibold) ImGui::PopFont();
-                ImGui::TextDisabled("Change State: %s", app::change_state_label(e->change_state));
+                const std::string st_txt = app::trf("inspector.change_state", {
+                    {"state", localized_change_state(e->change_state)}
+                });
+                ImGui::TextDisabled("%s", st_txt.c_str());
                 ImGui::Separator();
 
                 if (ImGui::BeginTable("##PropTable", 2, ImGuiTableFlags_SizingStretchProp)) {
                     ImGui::TableSetupColumn("Key", ImGuiTableColumnFlags_WidthFixed, 125.0f);
                     ImGui::TableSetupColumn("Val", ImGuiTableColumnFlags_WidthStretch);
 
-                    property_row("Extension", e->extension.empty() ? "(none)" : e->extension, fonts.mono);
-                    property_row("File Type", std::string(core::file_category_label(e->category)));
-                    property_row("Original Index",
-                        e->original_index.has_value() ? ("#" + std::to_string(*e->original_index)) : "Pending Import",
+                    property_row(
+                        app::tr_c("inspector.prop.extension"),
+                        e->extension.empty() ? app::tr("common.none") : e->extension,
+                        fonts.mono);
+                    property_row(
+                        app::tr_c("inspector.prop.file_type"),
+                        localized_category_label(e->category));
+                    property_row(
+                        app::tr_c("inspector.prop.orig_index"),
+                        e->original_index.has_value()
+                            ? ("#" + std::to_string(*e->original_index))
+                            : app::tr("inspector.prop.pending_import"),
                         fonts.mono);
 
                     char hex_buf[64];
-                    std::snprintf(hex_buf, sizeof(hex_buf), "0x%llX (%llu B)",
+                    std::snprintf(hex_buf, sizeof(hex_buf), "0x%llX (%llu %s)",
                         static_cast<unsigned long long>(e->original_offset_bytes),
-                        static_cast<unsigned long long>(e->original_offset_bytes));
-                    property_row("Sector Offset",
-                        e->uses_external_file ? "Assigned on rebuild" : std::to_string(e->offset_sectors),
+                        static_cast<unsigned long long>(e->original_offset_bytes),
+                        app::tr_c("common.bytes"));
+                    property_row(
+                        app::tr_c("inspector.prop.sector_offset"),
+                        e->uses_external_file
+                            ? app::tr("inspector.prop.assigned_rebuild")
+                            : std::to_string(e->offset_sectors),
                         fonts.mono);
                     if (!e->uses_external_file) {
-                        property_row("Byte Offset", hex_buf, fonts.mono);
+                        property_row(app::tr_c("inspector.prop.byte_offset"), hex_buf, fonts.mono);
                     }
-                    property_row("Streaming Size",
-                        std::to_string(e->streaming_size) + " sector(s)",
+                    property_row(
+                        app::tr_c("inspector.prop.streaming_size"),
+                        app::trf("inspector.prop.sectors_unit", {{"count", std::to_string(e->streaming_size)}}),
                         fonts.mono);
-                    property_row("Archive Size",
-                        std::to_string(e->archive_size) + " sector(s)",
+                    property_row(
+                        app::tr_c("inspector.prop.archive_size"),
+                        app::trf("inspector.prop.sectors_unit", {{"count", std::to_string(e->archive_size)}}),
                         fonts.mono);
-                    property_row("Effective Size",
-                        std::to_string(e->display_bytes()) + " bytes",
+                    property_row(
+                        app::tr_c("inspector.prop.effective_size"),
+                        std::to_string(e->display_bytes()) + " " + app::tr("common.bytes"),
                         fonts.mono);
                     if (e->uses_external_file) {
-                        property_row("Staged Source", platform::to_utf8(e->external_path), fonts.mono);
+                        property_row(app::tr_c("inspector.prop.staged_source"), platform::to_utf8(e->external_path), fonts.mono);
                     }
                     if (e->change_state == app::EntryChangeState::Renamed) {
-                        property_row("Previous Name", e->original_name, fonts.mono);
+                        property_row(app::tr_c("inspector.prop.prev_name"), e->original_name, fonts.mono);
                     }
 
                     ImGui::EndTable();
@@ -144,7 +175,7 @@ void render_inspector_panel(
 
                 if (e->original_index.has_value()) {
                     ImGui::Spacing();
-                    ImGui::TextDisabled("Entry Diagnostics");
+                    ImGui::TextDisabled("%s", app::tr_c("inspector.entry_diagnostics"));
                     ImGui::Separator();
                     bool any_diag = false;
                     for (const auto& d : doc->validation_report().diagnostics) {
@@ -158,7 +189,7 @@ void render_inspector_panel(
                         }
                     }
                     if (!any_diag) {
-                        ImGui::TextColored(pal.success, "%s No diagnostics for this entry.", icons::kCircleCheck);
+                        ImGui::TextColored(pal.success, "%s %s", icons::kCircleCheck, app::tr_c("inspector.no_entry_diagnostics"));
                     }
                 }
             }
@@ -167,38 +198,36 @@ void render_inspector_panel(
     }
 
     // 2. Pending Changes / Operation History tab
-    if (ImGui::BeginTabItem("History")) {
+    if (ImGui::BeginTabItem((app::tr("inspector.tab.history") + "###InspHist").c_str())) {
         if (!doc) {
-            ImGui::TextDisabled("No archive open.");
+            ImGui::TextDisabled("%s", app::tr_c("inspector.no_archive_open"));
         } else {
             const bool busy = controller.is_busy();
             const auto& hist = doc->history();
-            if (ImGui::Button("Undo", ImVec2(80, 0)) && !busy && hist.can_undo()) {
+            if (ImGui::Button(app::tr_c("inspector.history.undo"), ImVec2(85, 0)) && !busy && hist.can_undo()) {
                 doc->undo();
                 state.filter_dirty = true;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Redo", ImVec2(80, 0)) && !busy && hist.can_redo()) {
+            if (ImGui::Button(app::tr_c("inspector.history.redo"), ImVec2(85, 0)) && !busy && hist.can_redo()) {
                 doc->redo();
                 state.filter_dirty = true;
             }
             ImGui::SameLine();
-            if (ImGui::Button("Discard All") && !busy && doc->has_pending_changes()) {
+            if (ImGui::Button(app::tr_c("inspector.history.discard")) && !busy && doc->has_pending_changes()) {
                 doc->discard_pending_changes();
                 state.selected_ids.clear();
                 state.primary_selected_id.reset();
                 state.filter_dirty = true;
-                state.push_toast("Pending changes discarded", "Reverted to on-disk directory.");
+                state.push_toast(app::tr("toast.discarded"), app::tr("toast.discarded_detail"));
             }
 
             ImGui::Spacing();
-            ImGui::TextWrapped(
-                "Pending changes are staged in memory until you Rebuild & Save. "
-                "Committed rebuilds clear this undo stack; restore committed states from Backups.");
+            ImGui::TextWrapped("%s", app::tr_c("inspector.history.note"));
             ImGui::Separator();
 
             if (hist.records().empty()) {
-                ImGui::TextDisabled("No pending operations.");
+                ImGui::TextDisabled("%s", app::tr_c("inspector.history.empty"));
             } else {
                 ImGui::BeginChild("##HistoryScroll", ImVec2(0, 0), false);
                 for (std::size_t i = 0; i < hist.records().size(); ++i) {
@@ -222,42 +251,45 @@ void render_inspector_panel(
     }
 
     // 3. Validation tab
-    if (ImGui::BeginTabItem("Validation")) {
+    if (ImGui::BeginTabItem((app::tr("inspector.tab.validation") + "###InspVal").c_str())) {
         if (!doc) {
-            ImGui::TextDisabled("No archive open.");
+            ImGui::TextDisabled("%s", app::tr_c("inspector.no_archive_open"));
         } else {
             const auto& rep = doc->validation_report();
             const bool busy = controller.is_busy();
 
-            if (ImGui::Button("Quick Check") && !busy) {
+            if (ImGui::Button(app::tr_c("inspector.validation.quick")) && !busy) {
                 controller.start_validate_active(false);
             }
             ImGui::SameLine();
-            if (ImGui::Button("Full Read Check") && !busy) {
+            if (ImGui::Button(app::tr_c("inspector.validation.full")) && !busy) {
                 controller.start_validate_active(true);
             }
             ImGui::SameLine();
-            if (ImGui::Button("Export JSON") && !busy) {
+            if (ImGui::Button(app::tr_c("inspector.validation.export_json")) && !busy) {
                 export_validation_report_json(*doc, native_hwnd, state);
             }
 
             ImGui::Spacing();
-            ImGui::TextColored(pal.danger, "Errors: %zu", rep.error_count);
+            ImGui::TextColored(pal.danger, "%s",
+                app::trf("inspector.validation.errors", {{"count", std::to_string(rep.error_count)}}).c_str());
             ImGui::SameLine();
-            ImGui::TextColored(pal.warning, "Warnings: %zu", rep.warning_count);
+            ImGui::TextColored(pal.warning, "%s",
+                app::trf("inspector.validation.warnings", {{"count", std::to_string(rep.warning_count)}}).c_str());
             ImGui::SameLine();
-            ImGui::TextColored(pal.info_cyan, "Info: %zu", rep.info_count);
+            ImGui::TextColored(pal.info_cyan, "%s",
+                app::trf("inspector.validation.info", {{"count", std::to_string(rep.info_count)}}).c_str());
 
-            ImGui::Checkbox("Errors", &state.show_val_errors);
+            ImGui::Checkbox(app::tr_c("inspector.validation.filter_errors"), &state.show_val_errors);
             ImGui::SameLine();
-            ImGui::Checkbox("Warnings", &state.show_val_warnings);
+            ImGui::Checkbox(app::tr_c("inspector.validation.filter_warnings"), &state.show_val_warnings);
             ImGui::SameLine();
-            ImGui::Checkbox("Info", &state.show_val_info);
+            ImGui::Checkbox(app::tr_c("inspector.validation.filter_info"), &state.show_val_info);
             ImGui::Separator();
 
             ImGui::BeginChild("##ValidationList", ImVec2(0, 0), false);
             if (rep.diagnostics.empty()) {
-                ImGui::TextColored(pal.success, "%s Archive passed all VER2 checks.", icons::kCircleCheck);
+                ImGui::TextColored(pal.success, "%s %s", icons::kCircleCheck, app::tr_c("inspector.validation.passed"));
             } else {
                 for (std::size_t i = 0; i < rep.diagnostics.size(); ++i) {
                     const auto& d = rep.diagnostics[i];
@@ -296,13 +328,13 @@ void render_inspector_panel(
     }
 
     // 4. Backups tab
-    if (ImGui::BeginTabItem("Backups")) {
+    if (ImGui::BeginTabItem((app::tr("inspector.tab.backups") + "###InspBkp").c_str())) {
         const bool busy = controller.is_busy();
-        if (doc && ImGui::Button("Create Manual Backup") && !busy) {
+        if (doc && ImGui::Button(app::tr_c("inspector.backups.create")) && !busy) {
             controller.start_manual_backup_active("User-requested manual backup");
         }
         ImGui::SameLine();
-        if (ImGui::Button("Open Folder")) {
+        if (ImGui::Button(app::tr_c("inspector.backups.open_folder"))) {
             (void)platform::open_directory_in_file_manager(controller.backup_manager().backup_directory());
         }
 
@@ -312,32 +344,37 @@ void render_inspector_panel(
             : controller.backup_manager().list_backups();
 
         if (backups.empty()) {
-            ImGui::TextDisabled("No backups recorded yet for this archive.");
-            ImGui::TextWrapped("Automatic backups are created before every Rebuild & Save when enabled in Settings.");
+            ImGui::TextDisabled("%s", app::tr_c("inspector.backups.none"));
+            ImGui::TextWrapped("%s", app::tr_c("inspector.backups.hint"));
         } else {
             ImGui::BeginChild("##BackupList", ImVec2(0, 0), false);
             for (std::size_t i = 0; i < backups.size(); ++i) {
                 const auto& b = backups[i];
                 ImGui::PushID(static_cast<int>(i));
-                ImGui::Text("%s (%s)", b.id.c_str(), b.kind == app::BackupKind::Automatic ? "Auto" : "Manual");
-                ImGui::TextDisabled("%s  |  %llu bytes",
+                ImGui::Text("%s (%s)",
+                    b.id.c_str(),
+                    b.kind == app::BackupKind::Automatic
+                        ? app::tr_c("inspector.backups.auto")
+                        : app::tr_c("inspector.backups.manual"));
+                ImGui::TextDisabled("%s  |  %llu %s",
                     b.timestamp_utc.c_str(),
-                    static_cast<unsigned long long>(b.size_bytes));
+                    static_cast<unsigned long long>(b.size_bytes),
+                    app::tr_c("common.bytes"));
                 ImGui::TextDisabled("%s", b.reason.c_str());
                 if (!b.file_exists) {
-                    ImGui::TextColored(pal.danger, "Backup file missing on disk");
+                    ImGui::TextColored(pal.danger, "%s", app::tr_c("inspector.backups.missing"));
                 } else {
-                    if (ImGui::SmallButton("Restore") && !busy) {
+                    if (ImGui::SmallButton(app::tr_c("inspector.backups.restore")) && !busy) {
                         controller.start_restore_backup(b, controller.active_tab_index());
                     }
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Reveal")) {
+                    if (ImGui::SmallButton(app::tr_c("inspector.backups.reveal"))) {
                         (void)platform::reveal_in_file_manager(b.backup_file_path);
                     }
                     ImGui::SameLine();
-                    if (ImGui::SmallButton("Copy Recovery Info")) {
+                    if (ImGui::SmallButton(app::tr_c("inspector.backups.copy_info"))) {
                         ImGui::SetClipboardText(app::BackupManager::recovery_instructions(b).c_str());
-                        state.push_toast("Copied recovery instructions", b.id);
+                        state.push_toast(app::tr("toast.copied_recovery"), b.id);
                     }
                 }
                 ImGui::Separator();

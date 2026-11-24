@@ -1,4 +1,5 @@
 #include "ui/ExplorerTable.hpp"
+#include "app/Localization.hpp"
 #include "core/ImgFilename.hpp"
 #include "platform/FileDialogs.hpp"
 #include "platform/Platform.hpp"
@@ -69,7 +70,7 @@ void trigger_import_files(
 
     auto res = doc->stage_import(files, controller.settings().duplicate_policy);
     if (!res.ok()) {
-        state.push_toast("Import failed", res.error->message, true);
+        state.push_toast(app::tr("toast.import_failed"), res.error->message, true);
         return;
     }
 
@@ -84,17 +85,21 @@ void trigger_import_files(
     if (!r.rejected.empty()) {
         std::string first_reason = r.rejected[0].source_path.filename().string() + ": " + r.rejected[0].reason;
         state.push_toast(
-            "Imported with " + std::to_string(r.rejected.size()) + " rejected file(s)",
+            app::trf("toast.import_rejected", {{"count", std::to_string(r.rejected.size())}}),
             first_reason,
             true);
     } else if (r.imported_count + r.replaced_count + r.renamed_count > 0U) {
         state.push_toast(
-            "Staged import complete",
-            "Added: " + std::to_string(r.imported_count) +
-                ", Replaced: " + std::to_string(r.replaced_count) +
-                ", Renamed: " + std::to_string(r.renamed_count));
+            app::tr("toast.import_ok"),
+            app::trf("toast.import_ok_detail", {
+                {"added", std::to_string(r.imported_count)},
+                {"replaced", std::to_string(r.replaced_count)},
+                {"renamed", std::to_string(r.renamed_count)}
+            }));
     } else if (r.skipped_count > 0U) {
-        state.push_toast("Import skipped duplicates", std::to_string(r.skipped_count) + " file(s) skipped.");
+        state.push_toast(
+            app::tr("toast.import_skipped"),
+            app::trf("toast.import_skipped_detail", {{"count", std::to_string(r.skipped_count)}}));
     }
 }
 
@@ -111,13 +116,13 @@ void trigger_export_entries(
     if (!export_all) {
         ids = collect_active_selection(*doc, state);
         if (ids.empty()) {
-            state.push_toast("Nothing selected", "Select one or more entries to export.", true);
+            state.push_toast(app::tr("toast.nothing_selected"), app::tr("toast.select_export"), true);
             return;
         }
     }
     auto folder = platform::pick_folder_dialog(
         native_hwnd,
-        export_all ? "Export All Archive Entries To Folder" : "Export Selected Entries To Folder");
+        app::tr(export_all ? "dialog.export_all.title" : "dialog.export_sel.title"));
     if (!folder.has_value()) {
         return;
     }
@@ -133,27 +138,43 @@ void trigger_replace_selected(
         return;
     }
     if (!state.primary_selected_id.has_value()) {
-        state.push_toast("No entry selected", "Select an entry to replace.", true);
+        state.push_toast(app::tr("toast.no_entry_selected"), app::tr("toast.select_replace"), true);
         return;
     }
     const auto* entry = doc->find_by_id(*state.primary_selected_id);
     if (!entry || entry->change_state == app::EntryChangeState::Deleted) {
-        state.push_toast("Cannot replace", "Selected entry is marked for deletion.", true);
+        state.push_toast(app::tr("toast.cannot_replace"), app::tr("toast.deleted_selected"), true);
         return;
     }
     auto file = platform::open_file_dialog(
         native_hwnd,
-        "Replace '" + entry->name + "' With File",
+        app::trf("dialog.replace.title", {{"name", entry->name}}),
         {{"All Files (*.*)", "*.*"}});
     if (!file.has_value()) {
         return;
     }
     auto res = doc->stage_replace(entry->id, *file);
     if (!res.ok()) {
-        state.push_toast("Replace failed", res.error->message, true);
+        state.push_toast(app::tr("toast.replace_failed"), res.error->message, true);
     } else {
         state.filter_dirty = true;
-        state.push_toast("Staged replacement", entry->name);
+        state.push_toast(app::tr("toast.replace_ok"), entry->name);
+    }
+}
+
+const char* localized_category_label(core::FileCategory cat) {
+    switch (cat) {
+        case core::FileCategory::DffModel: return app::tr_c("category.dff");
+        case core::FileCategory::TxdTexture: return app::tr_c("category.txd");
+        case core::FileCategory::ColCollision: return app::tr_c("category.col");
+        case core::FileCategory::IfpAnimation: return app::tr_c("category.ifp");
+        case core::FileCategory::IplPlacement: return app::tr_c("category.ipl");
+        case core::FileCategory::IdeDefinition: return app::tr_c("category.ide");
+        case core::FileCategory::ScmScript: return app::tr_c("category.scm");
+        case core::FileCategory::DataConfig: return app::tr_c("category.data");
+        case core::FileCategory::FxpEffects: return app::tr_c("category.fxp");
+        case core::FileCategory::CutCutscene: return app::tr_c("category.cut");
+        default: return app::tr_c("category.other");
     }
 }
 
@@ -215,23 +236,27 @@ void render_explorer_table(
         state.focus_search_requested = false;
     }
     ImGui::SetNextItemWidth(280.0f);
-    if (ImGui::InputTextWithHint("##SearchEntries", "Search filename (Ctrl+F)...", &state.filter.search_text)) {
+    if (ImGui::InputTextWithHint("##SearchEntries", app::tr_c("explorer.search_hint"), &state.filter.search_text)) {
         state.filter_dirty = true;
     }
     ImGui::SameLine();
     ImGui::SetNextItemWidth(115.0f);
-    if (ImGui::InputTextWithHint("##ExtFilter", ".ext filter", &state.filter.extension_filter)) {
+    if (ImGui::InputTextWithHint("##ExtFilter", app::tr_c("explorer.ext_hint"), &state.filter.extension_filter)) {
         state.filter_dirty = true;
     }
     ImGui::SameLine();
-    if (ImGui::Button("Clear")) {
+    if (ImGui::Button(app::tr_c("common.clear"))) {
         state.filter.search_text.clear();
         state.filter.extension_filter.clear();
         state.filter.quick_filter = app::QuickFilterKind::All;
         state.filter_dirty = true;
     }
     ImGui::SameLine();
-    ImGui::TextDisabled("Showing %zu / %zu entries", state.visible_indices.size(), doc->entries().size());
+    const std::string showing_txt = app::trf("explorer.showing", {
+        {"visible", std::to_string(state.visible_indices.size())},
+        {"total", std::to_string(doc->entries().size())}
+    });
+    ImGui::TextDisabled("%s", showing_txt.c_str());
     ImGui::PopStyleVar();
 
     ImGui::Spacing();
@@ -252,14 +277,14 @@ void render_explorer_table(
     }
 
     ImGui::TableSetupScrollFreeze(0, 1);
-    ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortAscending, 92.0f, 7);
-    ImGui::TableSetupColumn("Filename", ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort, 2.2f, 1);
-    ImGui::TableSetupColumn("Ext", ImGuiTableColumnFlags_WidthFixed, 64.0f, 2);
-    ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 125.0f, 3);
-    ImGui::TableSetupColumn("Sector Offset", ImGuiTableColumnFlags_WidthFixed, 108.0f, 4);
-    ImGui::TableSetupColumn("Streaming", ImGuiTableColumnFlags_WidthFixed, 105.0f, 5);
-    ImGui::TableSetupColumn("Archive", ImGuiTableColumnFlags_WidthFixed, 92.0f, 6);
-    ImGui::TableSetupColumn("Index", ImGuiTableColumnFlags_WidthFixed, 66.0f, 0);
+    ImGui::TableSetupColumn((app::tr("explorer.col.status") + "###ColStatus").c_str(), ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortAscending, 92.0f, 7);
+    ImGui::TableSetupColumn((app::tr("explorer.col.filename") + "###ColFilename").c_str(), ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort, 2.2f, 1);
+    ImGui::TableSetupColumn((app::tr("explorer.col.ext") + "###ColExt").c_str(), ImGuiTableColumnFlags_WidthFixed, 64.0f, 2);
+    ImGui::TableSetupColumn((app::tr("explorer.col.type") + "###ColType").c_str(), ImGuiTableColumnFlags_WidthFixed, 125.0f, 3);
+    ImGui::TableSetupColumn((app::tr("explorer.col.sector_offset") + "###ColOffset").c_str(), ImGuiTableColumnFlags_WidthFixed, 108.0f, 4);
+    ImGui::TableSetupColumn((app::tr("explorer.col.streaming") + "###ColStreaming").c_str(), ImGuiTableColumnFlags_WidthFixed, 105.0f, 5);
+    ImGui::TableSetupColumn((app::tr("explorer.col.archive") + "###ColArchive").c_str(), ImGuiTableColumnFlags_WidthFixed, 92.0f, 6);
+    ImGui::TableSetupColumn((app::tr("explorer.col.index") + "###ColIndex").c_str(), ImGuiTableColumnFlags_WidthFixed, 66.0f, 0);
     ImGui::TableHeadersRow();
 
     if (ImGuiTableSortSpecs* sort_specs = ImGui::TableGetSortSpecs()) {
@@ -328,43 +353,43 @@ void render_explorer_table(
             ImGui::TableSetColumnIndex(0);
             ImVec4 status_col = pal.text_secondary;
             const char* status_icon = icons::kCircleCheck;
-            const char* status_text = "Clean";
+            const char* status_text = app::tr_c("explorer.status.clean");
             if (entry.change_state == app::EntryChangeState::Imported) {
                 status_col = pal.success;
                 status_icon = icons::kPlus;
-                status_text = "Added";
+                status_text = app::tr_c("explorer.status.added");
             } else if (entry.change_state == app::EntryChangeState::Replaced) {
                 status_col = pal.warning;
                 status_icon = icons::kArrowsRotate;
-                status_text = "Replaced";
+                status_text = app::tr_c("explorer.status.replaced");
             } else if (entry.change_state == app::EntryChangeState::Renamed) {
                 status_col = pal.info_cyan;
                 status_icon = icons::kPen;
-                status_text = "Renamed";
+                status_text = app::tr_c("explorer.status.renamed");
             } else if (entry.change_state == app::EntryChangeState::Deleted) {
                 status_col = pal.danger;
                 status_icon = icons::kTrash;
-                status_text = "Deleted";
+                status_text = app::tr_c("explorer.status.deleted");
             } else if (entry.original_index.has_value()) {
                 auto sit = sev_map.find(*entry.original_index);
                 if (sit != sev_map.end()) {
                     if (sit->second == core::DiagnosticSeverity::Error) {
                         status_col = pal.danger;
                         status_icon = icons::kCircleXmark;
-                        status_text = "Error";
+                        status_text = app::tr_c("explorer.status.error");
                     } else if (sit->second == core::DiagnosticSeverity::Warning) {
                         status_col = pal.warning;
                         status_icon = icons::kTriangleWarn;
-                        status_text = "Warn";
+                        status_text = app::tr_c("explorer.status.warn");
                     } else {
                         status_col = pal.info_cyan;
                         status_icon = icons::kCircleInfo;
-                        status_text = "Info";
+                        status_text = app::tr_c("explorer.status.info");
                     }
                 } else {
                     status_col = pal.success;
                     status_icon = icons::kCircleCheck;
-                    status_text = "OK";
+                    status_text = app::tr_c("explorer.status.ok");
                 }
             }
 
@@ -417,29 +442,29 @@ void render_explorer_table(
                 }
                 const bool busy = controller.is_busy();
                 if (entry.category == core::FileCategory::DffModel) {
-                    if (ImGui::MenuItem("Preview in DFF Studio", nullptr, false, !busy)) {
+                    if (ImGui::MenuItem(app::tr_c("explorer.ctx.preview_dff"), nullptr, false, !busy)) {
                         state.pending_preview_dff_entry_id = entry.id;
                         state.active_workspace = WorkspaceTab::DffStudio;
                     }
                     ImGui::Separator();
                 } else if (entry.category == core::FileCategory::TxdTexture) {
-                    if (ImGui::MenuItem("Preview in TXD Studio", nullptr, false, !busy)) {
+                    if (ImGui::MenuItem(app::tr_c("explorer.ctx.preview_txd"), nullptr, false, !busy)) {
                         state.pending_preview_txd_entry_id = entry.id;
                         state.active_workspace = WorkspaceTab::TxdStudio;
                     }
                     ImGui::Separator();
                 }
-                if (ImGui::MenuItem("Export Selected...", "Ctrl+E", false, !busy)) {
+                if (ImGui::MenuItem(app::tr_c("explorer.ctx.export"), "Ctrl+E", false, !busy)) {
                     trigger_export_entries(controller, state, native_hwnd, false);
                 }
-                if (ImGui::MenuItem("Replace With File...", nullptr, false, !busy && state.selected_ids.size() == 1U)) {
+                if (ImGui::MenuItem(app::tr_c("explorer.ctx.replace"), nullptr, false, !busy && state.selected_ids.size() == 1U)) {
                     trigger_replace_selected(controller, state, native_hwnd);
                 }
-                if (ImGui::MenuItem("Rename...", "F2", false, !busy && state.selected_ids.size() == 1U)) {
+                if (ImGui::MenuItem(app::tr_c("explorer.ctx.rename"), "F2", false, !busy && state.selected_ids.size() == 1U)) {
                     trigger_rename_selected(controller, state);
                 }
                 ImGui::Separator();
-                if (ImGui::MenuItem("Delete Selected", "Del", false, !busy)) {
+                if (ImGui::MenuItem(app::tr_c("explorer.ctx.delete"), "Del", false, !busy)) {
                     trigger_delete_selected(controller, state);
                 }
                 ImGui::EndPopup();
@@ -462,14 +487,13 @@ void render_explorer_table(
 
             // Col 3: Type
             ImGui::TableSetColumnIndex(3);
-            const auto cat_lbl = core::file_category_label(entry.category);
-            ImGui::TextUnformatted(cat_lbl.data(), cat_lbl.data() + cat_lbl.size());
+            ImGui::TextUnformatted(localized_category_label(entry.category));
 
             // Col 4: Sector Offset
             ImGui::TableSetColumnIndex(4);
             if (fonts.mono) ImGui::PushFont(fonts.mono);
             if (entry.uses_external_file) {
-                ImGui::TextDisabled("pending");
+                ImGui::TextDisabled("%s", app::tr_c("explorer.pending"));
             } else {
                 ImGui::Text("%u", entry.offset_sectors);
             }
@@ -494,7 +518,7 @@ void render_explorer_table(
             if (entry.original_index.has_value()) {
                 ImGui::Text("#%u", *entry.original_index);
             } else {
-                ImGui::TextDisabled("new");
+                ImGui::TextDisabled("%s", app::tr_c("explorer.new"));
             }
             if (fonts.mono) ImGui::PopFont();
 

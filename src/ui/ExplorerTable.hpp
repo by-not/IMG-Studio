@@ -37,4 +37,6 @@ void trigger_delete_selected(
     app::ArchiveController& controller,
     UiState& state);
 
+[[nodiscard]] const char* localized_category_label(core::FileCategory cat);
+
 } // namespace imgstudio::ui

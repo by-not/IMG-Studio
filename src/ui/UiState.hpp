@@ -61,6 +61,7 @@ struct UiState {
 
     bool open_settings_modal = false;
     app::AppSettings settings_draft{};
+    std::string settings_initial_language = "auto";
 
     bool open_about_modal = false;
     bool open_close_confirm_modal = false;

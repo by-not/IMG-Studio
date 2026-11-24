@@ -50,7 +50,7 @@ struct AsyncCompletion {
 
 class ArchiveController {
 public:
-    ArchiveController();
+    explicit ArchiveController(std::optional<std::filesystem::path> settings_override = std::nullopt);
     ~ArchiveController();
 
     ArchiveController(const ArchiveController&) = delete;

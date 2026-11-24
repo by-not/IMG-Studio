@@ -147,8 +147,22 @@ FontBundle load_application_fonts(float dpi_scale, float user_scale) {
 #endif
 
     FontBundle bundle;
+    static ImVector<ImWchar> glyph_ranges;
+    if (glyph_ranges.empty()) {
+        ImFontGlyphRangesBuilder builder;
+        builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+        static const ImWchar kLatinExtAndSymbols[] = {
+            0x0100, 0x017F, // Latin Extended-A (Polish, Czech, etc.)
+            0x2013, 0x2026, // En-dash, Em-dash, quotes, bullet, ellipsis
+            0
+        };
+        builder.AddRanges(kLatinExtAndSymbols);
+        builder.BuildRanges(&glyph_ranges);
+    }
+
     if (file_exists(regular_path)) {
-        bundle.regular = io.Fonts->AddFontFromFileTTF(platform::to_utf8(regular_path).c_str(), base_px);
+        bundle.regular = io.Fonts->AddFontFromFileTTF(
+            platform::to_utf8(regular_path).c_str(), base_px, nullptr, glyph_ranges.Data);
         bundle.loaded_summary += "UI=" + regular_path.filename().string();
     } else {
         bundle.regular = io.Fonts->AddFontDefault();
@@ -157,7 +171,8 @@ FontBundle load_application_fonts(float dpi_scale, float user_scale) {
     merge_fontawesome(io, icon_px, fa_path);
 
     if (file_exists(semibold_path)) {
-        bundle.semibold = io.Fonts->AddFontFromFileTTF(platform::to_utf8(semibold_path).c_str(), bold_px);
+        bundle.semibold = io.Fonts->AddFontFromFileTTF(
+            platform::to_utf8(semibold_path).c_str(), bold_px, nullptr, glyph_ranges.Data);
         merge_fontawesome(io, icon_px, fa_path);
         bundle.loaded_summary += ";SemiBold=" + semibold_path.filename().string();
     } else {
@@ -165,7 +180,8 @@ FontBundle load_application_fonts(float dpi_scale, float user_scale) {
     }
 
     if (file_exists(mono_path)) {
-        bundle.mono = io.Fonts->AddFontFromFileTTF(platform::to_utf8(mono_path).c_str(), mono_px);
+        bundle.mono = io.Fonts->AddFontFromFileTTF(
+            platform::to_utf8(mono_path).c_str(), mono_px, nullptr, glyph_ranges.Data);
         bundle.loaded_summary += ";Mono=" + mono_path.filename().string();
     } else {
         bundle.mono = bundle.regular;
