@@ -1,4 +1,5 @@
 #include "ui/TxdStudioView.hpp"
+#include "app/Localization.hpp"
 #include "core/ImgFilename.hpp"
 #include "core/rw/ImageExporter.hpp"
 #include "core/rw/RwStream.hpp"
@@ -107,7 +108,7 @@ void TxdStudioView::handle_loader_completions(UiState& ui_state) {
         if (comp.kind == app::AssetLoadCompletion::Kind::TxdLoaded && comp.txd_dict) {
             last_error_.clear();
             set_dictionary(comp.txd_dict);
-            ui_state.push_toast("TXD Dictionary Loaded", comp.txd_dict->source_name);
+            ui_state.push_toast(app::tr("toast.txd_loaded"), comp.txd_dict->source_name);
         }
     }
 }
@@ -116,7 +117,7 @@ void TxdStudioView::export_textures(bool export_all, void* native_hwnd, UiState&
     if (!dict_) return;
     auto folder = platform::pick_folder_dialog(
         native_hwnd,
-        export_all ? "Export All TXD Textures To Folder" : "Export Selected TXD Textures To Folder");
+        app::tr(export_all ? "txd.export_all_dialog" : "txd.export_sel_dialog"));
     if (!folder.has_value()) {
         return;
     }
@@ -157,11 +158,19 @@ void TxdStudioView::export_textures(bool export_all, void* native_hwnd, UiState&
 
     if (failed > 0U) {
         ui_state.push_toast(
-            "Exported " + std::to_string(exported) + ", failed " + std::to_string(failed),
+            app::trf("toast.txd_export_partial", {
+                {"exported", std::to_string(exported)},
+                {"failed", std::to_string(failed)}
+            }),
             first_err,
             true);
     } else {
-        ui_state.push_toast("Textures Exported", "Saved " + std::to_string(exported) + " file(s) as " + ext);
+        ui_state.push_toast(
+            app::tr("toast.txd_export_ok"),
+            app::trf("toast.txd_export_ok_detail", {
+                {"count", std::to_string(exported)},
+                {"ext", ext}
+            }));
     }
 }
 
@@ -186,30 +195,40 @@ void TxdStudioView::render(
     ImGui::PushStyleColor(ImGuiCol_ChildBg, pal.bg_panel);
     ImGui::BeginChild("##TxdToolbar", ImVec2(0.0f, 44.0f), true, ImGuiWindowFlags_NoScrollbar);
     {
-        if (ImGui::Button((std::string(icons::kFolderOpen) + " Open TXD...").c_str()) && !busy) {
+        if (ImGui::Button((std::string(icons::kFolderOpen) + " " + app::tr("txd.open_btn") + "###TxdOpen").c_str()) && !busy) {
             if (auto p = platform::open_file_dialog(
                     native_hwnd,
-                    "Open GTA San Andreas TXD Dictionary",
+                    app::tr("txd.open_dialog"),
                     {{"RenderWare TXD (*.txd)", "*.txd"}, {"All Files (*.*)", "*.*"}})) {
                 loader_.start_load_txd_from_file(*p, false);
             }
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(190.0f);
-        ImGui::InputTextWithHint("##TxdSearch", "Search texture...", &search_text_);
+        ImGui::InputTextWithHint("##TxdSearch", app::tr_c("txd.search_hint"), &search_text_);
         ImGui::SameLine();
 
         int dim_idx = static_cast<int>(dim_filter_);
-        const char* dim_items[] = {"All Sizes", "<= 64 px", "128 px", "256 px", ">= 512 px"};
-        ImGui::SetNextItemWidth(110.0f);
+        const char* dim_items[] = {
+            app::tr_c("txd.dim.all"),
+            app::tr_c("txd.dim.le64"),
+            app::tr_c("txd.dim.128"),
+            app::tr_c("txd.dim.256"),
+            app::tr_c("txd.dim.ge512")
+        };
+        ImGui::SetNextItemWidth(115.0f);
         if (ImGui::Combo("##DimFilter", &dim_idx, dim_items, 5)) {
             dim_filter_ = static_cast<DimFilter>(dim_idx);
         }
 
         ImGui::SameLine();
         int sort_idx = static_cast<int>(sort_mode_);
-        const char* sort_items[] = {"Order: Disk", "Sort: Name", "Sort: Size"};
-        ImGui::SetNextItemWidth(115.0f);
+        const char* sort_items[] = {
+            app::tr_c("txd.sort.disk"),
+            app::tr_c("txd.sort.name"),
+            app::tr_c("txd.sort.size")
+        };
+        ImGui::SetNextItemWidth(120.0f);
         if (ImGui::Combo("##TxdSort", &sort_idx, sort_items, 3)) {
             sort_mode_ = static_cast<SortMode>(sort_idx);
         }
@@ -224,13 +243,13 @@ void TxdStudioView::render(
 
         const bool has_dict = (dict_ != nullptr && !dict_->textures.empty());
         if (!has_dict || selected_indices_.empty()) ImGui::BeginDisabled();
-        if (ImGui::Button("Export Selected")) {
+        if (ImGui::Button((app::tr("txd.export_selected") + "###TxdExpSel").c_str())) {
             export_textures(false, native_hwnd, ui_state);
         }
         if (!has_dict || selected_indices_.empty()) ImGui::EndDisabled();
         ImGui::SameLine();
         if (!has_dict) ImGui::BeginDisabled();
-        if (ImGui::Button("Export All")) {
+        if (ImGui::Button((app::tr("txd.export_all") + "###TxdExpAll").c_str())) {
             export_textures(true, native_hwnd, ui_state);
         }
         if (!has_dict) ImGui::EndDisabled();
@@ -248,9 +267,9 @@ void TxdStudioView::render(
     ImGui::BeginChild("##TxdThumbGrid", ImVec2(grid_w, body_h), true);
     {
         if (busy) {
-            ImGui::TextColored(pal.accent_hover, "%s Loading TXD...", icons::kArrowsRotate);
+            ImGui::TextColored(pal.accent_hover, "%s %s", icons::kArrowsRotate, app::tr_c("txd.loading"));
         } else if (!dict_) {
-            ImGui::TextDisabled("Open a .txd file or double-click/right-click a .txd entry in Archive Explorer.");
+            ImGui::TextDisabled("%s", app::tr_c("txd.empty_prompt"));
             if (!last_error_.empty()) {
                 ImGui::TextColored(pal.danger, "%s", last_error_.c_str());
             }
@@ -284,7 +303,10 @@ void TxdStudioView::render(
                 });
             }
 
-            ImGui::TextDisabled("Showing %zu / %zu textures", visible.size(), dict_->textures.size());
+            ImGui::TextDisabled("%s", app::trf("txd.showing", {
+                {"visible", std::to_string(visible.size())},
+                {"total", std::to_string(dict_->textures.size())}
+            }).c_str());
             ImGui::Separator();
 
             const int cols = 2;
@@ -309,9 +331,9 @@ void TxdStudioView::render(
                     } else {
                         ImGui::Dummy(ImVec2(cell_w - 18.0f, 82.0f));
                         ImGui::SetCursorPos(ImVec2(12.0f, 38.0f));
-                        ImGui::TextColored(pal.warning, "Unsupported");
+                        ImGui::TextColored(pal.warning, "%s", app::tr_c("txd.unsupported"));
                     }
-                    ImGui::Text("%s", tex.name.empty() ? "(unnamed)" : tex.name.c_str());
+                    ImGui::Text("%s", tex.name.empty() ? app::tr_c("common.unnamed") : tex.name.c_str());
                     ImGui::TextDisabled("%ux%u  %s", tex.width, tex.height, tex.format_name.c_str());
                 }
                 ImGui::EndChild();
@@ -352,22 +374,29 @@ void TxdStudioView::render(
         ImGui::SameLine();
 
         int bg = static_cast<int>(bg_style_);
-        const char* bg_items[] = {"Checker", "Dark", "Light"};
-        ImGui::SetNextItemWidth(95.0f);
+        const char* bg_items[] = {
+            app::tr_c("txd.bg.checker"),
+            app::tr_c("txd.bg.dark"),
+            app::tr_c("txd.bg.light")
+        };
+        ImGui::SetNextItemWidth(100.0f);
         if (ImGui::Combo("##BgStyle", &bg, bg_items, 3)) {
             bg_style_ = static_cast<BgStyle>(bg);
         }
         ImGui::SameLine();
 
         int flt = static_cast<int>(filter_mode_);
-        const char* flt_items[] = {"Linear", "Nearest"};
-        ImGui::SetNextItemWidth(90.0f);
+        const char* flt_items[] = {
+            app::tr_c("txd.filter.linear"),
+            app::tr_c("txd.filter.nearest")
+        };
+        ImGui::SetNextItemWidth(95.0f);
         if (ImGui::Combo("##Filter", &flt, flt_items, 2)) {
             filter_mode_ = static_cast<render::TextureFilterMode>(flt);
             preview_gpu_tex_.set_filter(filter_mode_);
         }
         ImGui::SameLine();
-        ImGui::Checkbox("Fit", &fit_viewport_);
+        ImGui::Checkbox((app::tr("txd.fit") + "###TxdFit").c_str(), &fit_viewport_);
         if (!fit_viewport_) {
             ImGui::SameLine();
             ImGui::SetNextItemWidth(110.0f);
@@ -440,7 +469,9 @@ void TxdStudioView::render(
         } else if (dict_ && primary_index_ < dict_->textures.size()) {
             const auto& tex = dict_->textures[primary_index_];
             ImGui::SetCursorScreenPos(ImVec2(canvas_pos.x + 16.0f, canvas_pos.y + 16.0f));
-            ImGui::TextColored(pal.warning, "Texture cannot be rendered: %s", tex.unsupported_reason.c_str());
+            ImGui::TextColored(pal.warning, "%s", app::trf("txd.cannot_render", {
+                {"reason", tex.unsupported_reason}
+            }).c_str());
         }
     }
     ImGui::EndChild();
@@ -453,41 +484,57 @@ void TxdStudioView::render(
     ImGui::BeginChild("##TxdInspector", ImVec2(0.0f, body_h), true);
     {
         if (fonts.semibold) ImGui::PushFont(fonts.semibold);
-        ImGui::TextUnformatted("TEXTURE INSPECTOR");
+        ImGui::TextUnformatted(app::tr_c("txd.inspector_title"));
         if (fonts.semibold) ImGui::PopFont();
         ImGui::Separator();
 
         if (!dict_ || primary_index_ >= dict_->textures.size()) {
-            ImGui::TextDisabled("Select a texture to inspect metadata.");
+            ImGui::TextDisabled("%s", app::tr_c("txd.select_prompt"));
         } else {
             const auto& t = dict_->textures[primary_index_];
             if (fonts.semibold) ImGui::PushFont(fonts.semibold);
             ImGui::TextWrapped("%s", t.name.c_str());
             if (fonts.semibold) ImGui::PopFont();
-            ImGui::TextDisabled("Dictionary: %s (RW %s)",
-                dict_->source_name.c_str(),
-                core::rw::format_rw_version(dict_->rw_version).c_str());
+            ImGui::TextDisabled("%s", app::trf("txd.dict_meta", {
+                {"name", dict_->source_name},
+                {"ver", core::rw::format_rw_version(dict_->rw_version)}
+            }).c_str());
             ImGui::Separator();
-            ImGui::Text("Dimensions:  %u x %u", t.width, t.height);
-            ImGui::Text("Format:      %s", t.format_name.c_str());
-            ImGui::Text("Platform ID: %u", t.platform_id);
-            ImGui::Text("Depth:       %u bpp", t.depth);
-            ImGui::Text("Mipmaps:     %zu decoded (%u declared)", t.mipmaps.size(), t.mipmap_count_declared);
-            ImGui::Text("Has Alpha:   %s", t.has_alpha ? "Yes" : "No");
-            ImGui::Text("Compressed:  %s", t.is_compressed ? "Yes" : "No");
-            ImGui::Text("Paletted:    %s", t.is_paletted ? "Yes" : "No");
-            ImGui::Text("Cubemap:     %s", t.is_cubemap ? "Yes" : "No");
+            const std::string yes_no_alpha = app::tr(t.has_alpha ? "common.yes" : "common.no");
+            const std::string yes_no_comp = app::tr(t.is_compressed ? "common.yes" : "common.no");
+            const std::string yes_no_pal = app::tr(t.is_paletted ? "common.yes" : "common.no");
+            const std::string yes_no_cube = app::tr(t.is_cubemap ? "common.yes" : "common.no");
+
+            ImGui::TextUnformatted(app::trf("txd.dimensions", {
+                {"w", std::to_string(t.width)},
+                {"h", std::to_string(t.height)}
+            }).c_str());
+            ImGui::TextUnformatted(app::trf("txd.format", {{"fmt", t.format_name}}).c_str());
+            ImGui::TextUnformatted(app::trf("txd.platform", {{"id", std::to_string(t.platform_id)}}).c_str());
+            ImGui::TextUnformatted(app::trf("txd.depth", {{"bpp", std::to_string(t.depth)}}).c_str());
+            ImGui::TextUnformatted(app::trf("txd.mipmaps", {
+                {"decoded", std::to_string(t.mipmaps.size())},
+                {"declared", std::to_string(t.mipmap_count_declared)}
+            }).c_str());
+            ImGui::TextUnformatted(app::trf("txd.has_alpha", {{"val", yes_no_alpha}}).c_str());
+            ImGui::TextUnformatted(app::trf("txd.compressed", {{"val", yes_no_comp}}).c_str());
+            ImGui::TextUnformatted(app::trf("txd.paletted", {{"val", yes_no_pal}}).c_str());
+            ImGui::TextUnformatted(app::trf("txd.cubemap", {{"val", yes_no_cube}}).c_str());
             if (!t.mask_name.empty()) {
-                ImGui::Text("Alpha Mask:  %s", t.mask_name.c_str());
+                ImGui::TextUnformatted(app::trf("txd.alpha_mask", {{"name", t.mask_name}}).c_str());
             }
             if (!t.supported) {
                 ImGui::Spacing();
-                ImGui::TextColored(pal.warning, "Unsupported: %s", t.unsupported_reason.c_str());
+                ImGui::TextColored(pal.warning, "%s", app::trf("txd.unsupported_reason", {
+                    {"reason", t.unsupported_reason}
+                }).c_str());
             }
 
             if (!dict_->warnings.empty()) {
                 ImGui::Spacing();
-                ImGui::TextColored(pal.warning, "Dictionary Warnings (%zu)", dict_->warnings.size());
+                ImGui::TextColored(pal.warning, "%s", app::trf("txd.dict_warnings", {
+                    {"count", std::to_string(dict_->warnings.size())}
+                }).c_str());
                 ImGui::Separator();
                 for (const auto& w : dict_->warnings) {
                     ImGui::TextWrapped("• %s%s%s",

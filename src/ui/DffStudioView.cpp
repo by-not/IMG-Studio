@@ -1,4 +1,5 @@
 #include "ui/DffStudioView.hpp"
+#include "app/Localization.hpp"
 #include "core/ImgFilename.hpp"
 #include "core/rw/RwStream.hpp"
 #include "platform/FileDialogs.hpp"
@@ -59,13 +60,13 @@ void DffStudioView::handle_loader_completions(UiState& ui_state) {
             last_load_error_.clear();
             renderer_.upload_session(*session_);
             renderer_.fit_camera(camera_, view_settings_);
-            ui_state.push_toast("DFF Model Loaded", session_->model.source_name);
+            ui_state.push_toast(app::tr("toast.dff_loaded"), session_->model.source_name);
         } else if (comp.kind == app::AssetLoadCompletion::Kind::AdditionalTxdLoaded &&
                    comp.txd_dict && session_.has_value()) {
             session_->loaded_txds.insert(session_->loaded_txds.begin(), comp.txd_dict);
             app::AssetLoader::resolve_dff_textures(*session_);
             renderer_.refresh_textures(*session_);
-            ui_state.push_toast("TXD Attached to Model", comp.txd_dict->source_name);
+            ui_state.push_toast(app::tr("toast.txd_attached"), comp.txd_dict->source_name);
         }
     }
 }
@@ -91,20 +92,20 @@ void DffStudioView::render(
     ImGui::PushStyleColor(ImGuiCol_ChildBg, pal.bg_panel);
     ImGui::BeginChild("##DffToolbar", ImVec2(0.0f, 44.0f), true, ImGuiWindowFlags_NoScrollbar);
     {
-        if (ImGui::Button((std::string(icons::kFolderOpen) + " Open DFF...").c_str()) && !busy) {
+        if (ImGui::Button((std::string(icons::kFolderOpen) + " " + app::tr("dff.open_btn") + "###DffOpen").c_str()) && !busy) {
             if (auto p = platform::open_file_dialog(
                     native_hwnd,
-                    "Open GTA San Andreas DFF Model",
+                    app::tr("dff.open_dialog"),
                     {{"RenderWare DFF (*.dff)", "*.dff"}, {"All Files (*.*)", "*.*"}})) {
                 loader_.start_load_dff_from_file(*p);
             }
         }
         ImGui::SameLine();
         if (!session_.has_value() || busy) ImGui::BeginDisabled();
-        if (ImGui::Button((std::string(icons::kImage) + " Load TXD...").c_str())) {
+        if (ImGui::Button((std::string(icons::kImage) + " " + app::tr("dff.load_txd_btn") + "###DffLoadTxd").c_str())) {
             if (auto p = platform::open_file_dialog(
                     native_hwnd,
-                    "Attach TXD Dictionary For Textures",
+                    app::tr("dff.load_txd_dialog"),
                     {{"RenderWare TXD (*.txd)", "*.txd"}, {"All Files (*.*)", "*.*"}})) {
                 loader_.start_load_txd_from_file(*p, true);
             }
@@ -116,35 +117,40 @@ void DffStudioView::render(
         ImGui::SameLine();
 
         int mode_idx = static_cast<int>(view_settings_.mode);
-        const char* mode_items[] = {"Textured", "Solid", "Wireframe", "Materials"};
+        const char* mode_items[] = {
+            app::tr_c("dff.mode.textured"),
+            app::tr_c("dff.mode.solid"),
+            app::tr_c("dff.mode.wireframe"),
+            app::tr_c("dff.mode.materials")
+        };
         ImGui::SetNextItemWidth(120.0f);
         if (ImGui::Combo("##RenderMode", &mode_idx, mode_items, 4)) {
             view_settings_.mode = static_cast<render::DffRenderMode>(mode_idx);
         }
 
         ImGui::SameLine();
-        ImGui::Checkbox("Grid", &view_settings_.show_grid);
+        ImGui::Checkbox((app::tr("dff.grid") + "###DffGrid").c_str(), &view_settings_.show_grid);
         ImGui::SameLine();
-        ImGui::Checkbox("Axes", &view_settings_.show_axes);
+        ImGui::Checkbox((app::tr("dff.axes") + "###DffAxes").c_str(), &view_settings_.show_axes);
         ImGui::SameLine();
-        ImGui::Checkbox("Cull", &view_settings_.backface_cull);
+        ImGui::Checkbox((app::tr("dff.cull") + "###DffCull").c_str(), &view_settings_.backface_cull);
         ImGui::SameLine();
-        if (ImGui::Checkbox("Center", &view_settings_.center_model)) {
+        if (ImGui::Checkbox((app::tr("dff.center") + "###DffCenter").c_str(), &view_settings_.center_model)) {
             renderer_.fit_camera(camera_, view_settings_);
         }
         ImGui::SameLine();
-        if (ImGui::Button("Fit")) {
+        if (ImGui::Button((app::tr("dff.fit") + "###DffFit").c_str())) {
             renderer_.fit_camera(camera_, view_settings_);
         }
         ImGui::SameLine();
-        if (ImGui::Button("Reset Cam")) {
+        if (ImGui::Button((app::tr("dff.reset_cam") + "###DffResetCam").c_str())) {
             camera_ = render::OrbitCamera{};
             renderer_.fit_camera(camera_, view_settings_);
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(120.0f);
         ImGui::ColorEdit3("##BgCol", view_settings_.bg_color.data(), ImGuiColorEditFlags_NoInputs);
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Viewport background color");
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", app::tr_c("dff.bg_tip"));
     }
     ImGui::EndChild();
     ImGui::PopStyleColor();
@@ -162,7 +168,8 @@ void DffStudioView::render(
         const int rh = std::max(64, static_cast<int>(avail.y));
 
         if (!renderer_.is_initialized() && !renderer_.initialize()) {
-            ImGui::TextColored(pal.danger, "OpenGL 3.3 Renderer Error: %s", renderer_.last_error().c_str());
+            ImGui::TextColored(pal.danger, "%s",
+                app::trf("dff.gl_error", {{"error", renderer_.last_error()}}).c_str());
         } else {
             renderer_.render(rw, rh, camera_, view_settings_);
             const ImVec2 img_pos = ImGui::GetCursorScreenPos();
@@ -191,17 +198,18 @@ void DffStudioView::render(
 
             if (busy) {
                 ImGui::SetCursorScreenPos(ImVec2(img_pos.x + 14.0f, img_pos.y + 14.0f));
-                ImGui::TextColored(pal.accent_hover, "%s Loading DFF model...", icons::kArrowsRotate);
+                ImGui::TextColored(pal.accent_hover, "%s %s", icons::kArrowsRotate, app::tr_c("dff.loading"));
             } else if (!session_.has_value()) {
                 ImGui::SetCursorScreenPos(ImVec2(img_pos.x + 18.0f, img_pos.y + 18.0f));
-                ImGui::TextDisabled("Open an external .dff file or right-click a .dff entry in Archive Explorer.");
+                ImGui::TextDisabled("%s", app::tr_c("dff.empty_prompt"));
                 if (!last_load_error_.empty()) {
                     ImGui::SetCursorScreenPos(ImVec2(img_pos.x + 18.0f, img_pos.y + 42.0f));
-                    ImGui::TextColored(pal.danger, "Last error: %s", last_load_error_.c_str());
+                    ImGui::TextColored(pal.danger, "%s",
+                        app::trf("dff.last_error", {{"error", last_load_error_}}).c_str());
                 }
             } else {
                 ImGui::SetCursorScreenPos(ImVec2(img_pos.x + 12.0f, img_pos.y + static_cast<float>(rh) - 24.0f));
-                ImGui::TextDisabled("LMB: Orbit  |  RMB / Shift+LMB: Pan  |  Wheel: Zoom");
+                ImGui::TextDisabled("%s", app::tr_c("dff.controls_hint"));
             }
         }
     }
@@ -215,31 +223,38 @@ void DffStudioView::render(
     ImGui::BeginChild("##DffInfoPanel", ImVec2(0.0f, body_h), true);
     {
         if (fonts.semibold) ImGui::PushFont(fonts.semibold);
-        ImGui::TextUnformatted("MODEL INSPECTOR");
+        ImGui::TextUnformatted(app::tr_c("dff.inspector_title"));
         if (fonts.semibold) ImGui::PopFont();
         ImGui::Separator();
 
-        ImGui::TextDisabled("Lighting");
+        ImGui::TextDisabled("%s", app::tr_c("dff.lighting"));
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SliderFloat("Azimuth", &view_settings_.light_azimuth_deg, -180.0f, 180.0f, "%.0f deg");
+        ImGui::SliderFloat((app::tr("dff.azimuth") + "###DffAzimuth").c_str(), &view_settings_.light_azimuth_deg, -180.0f, 180.0f, "%.0f deg");
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SliderFloat("Elevation", &view_settings_.light_elevation_deg, -89.0f, 89.0f, "%.0f deg");
+        ImGui::SliderFloat((app::tr("dff.elevation") + "###DffElevation").c_str(), &view_settings_.light_elevation_deg, -89.0f, 89.0f, "%.0f deg");
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::SliderFloat("Ambient", &view_settings_.ambient_strength, 0.05f, 0.90f, "%.2f");
+        ImGui::SliderFloat((app::tr("dff.ambient") + "###DffAmbient").c_str(), &view_settings_.ambient_strength, 0.05f, 0.90f, "%.2f");
         ImGui::Separator();
 
         if (!session_.has_value()) {
-            ImGui::TextDisabled("No model loaded.");
+            ImGui::TextDisabled("%s", app::tr_c("dff.no_model"));
         } else {
             const auto& m = session_->model;
             if (fonts.semibold) ImGui::PushFont(fonts.semibold);
             ImGui::TextWrapped("%s", m.source_name.c_str());
             if (fonts.semibold) ImGui::PopFont();
-            ImGui::TextDisabled("RW Version: %s  |  %llu bytes",
-                core::rw::format_rw_version(m.rw_version).c_str(),
-                static_cast<unsigned long long>(m.file_size_bytes));
-            ImGui::Text("Geometries: %zu  |  Materials: %zu", m.geometries.size(), m.total_materials);
-            ImGui::Text("Vertices:   %zu  |  Triangles: %zu", m.total_vertices, m.total_triangles);
+            ImGui::TextDisabled("%s", app::trf("dff.rw_meta", {
+                {"ver", core::rw::format_rw_version(m.rw_version)},
+                {"size", std::to_string(m.file_size_bytes)}
+            }).c_str());
+            ImGui::TextUnformatted(app::trf("dff.geom_mats", {
+                {"geoms", std::to_string(m.geometries.size())},
+                {"mats", std::to_string(m.total_materials)}
+            }).c_str());
+            ImGui::TextUnformatted(app::trf("dff.verts_tris", {
+                {"verts", std::to_string(m.total_vertices)},
+                {"tris", std::to_string(m.total_triangles)}
+            }).c_str());
 
             if (m.bounds.valid) {
                 char bbuf[128];
@@ -248,18 +263,20 @@ void DffStudioView::render(
                     m.bounds.max.y - m.bounds.min.y,
                     m.bounds.max.z - m.bounds.min.z);
                 if (fonts.mono) ImGui::PushFont(fonts.mono);
-                ImGui::Text("Bounds (W/D/H): %s", bbuf);
+                ImGui::TextUnformatted(app::trf("dff.bounds", {{"bounds", bbuf}}).c_str());
                 if (fonts.mono) ImGui::PopFont();
             }
 
             ImGui::Spacing();
             if (fonts.semibold) ImGui::PushFont(fonts.semibold);
-            ImGui::Text("Texture References (%zu)", m.referenced_textures.size());
+            ImGui::TextUnformatted(app::trf("dff.tex_refs", {
+                {"count", std::to_string(m.referenced_textures.size())}
+            }).c_str());
             if (fonts.semibold) ImGui::PopFont();
             ImGui::Separator();
 
             if (m.referenced_textures.empty()) {
-                ImGui::TextDisabled("Model materials reference no external textures.");
+                ImGui::TextDisabled("%s", app::tr_c("dff.no_tex_refs"));
             } else {
                 for (const auto& tname : m.referenced_textures) {
                     const std::string key = core::to_ascii_lower(tname);
@@ -269,24 +286,28 @@ void DffStudioView::render(
                         ImGui::SameLine();
                         ImGui::TextDisabled("(%s)", it->second.source_txd_name.c_str());
                     } else {
-                        ImGui::TextColored(pal.warning, "%s %s (missing)", icons::kTriangleWarn, tname.c_str());
+                        ImGui::TextColored(pal.warning, "%s %s (%s)", icons::kTriangleWarn, tname.c_str(), app::tr_c("dff.missing_tex"));
                     }
                 }
             }
 
             if (!session_->loaded_txds.empty()) {
                 ImGui::Spacing();
-                ImGui::TextDisabled("Loaded TXD Dictionaries:");
+                ImGui::TextDisabled("%s", app::tr_c("dff.loaded_txds"));
                 for (const auto& td : session_->loaded_txds) {
-                    ImGui::BulletText("%s (%zu tex)", td->source_name.c_str(), td->textures.size());
+                    ImGui::BulletText("%s", app::trf("dff.txd_entry_count", {
+                        {"name", td->source_name},
+                        {"count", std::to_string(td->textures.size())}
+                    }).c_str());
                 }
             }
 
             if (!m.warnings.empty() || !session_->resolution_notes.empty()) {
                 ImGui::Spacing();
                 if (fonts.semibold) ImGui::PushFont(fonts.semibold);
-                ImGui::TextColored(pal.warning, "Diagnostics (%zu)",
-                    m.warnings.size() + session_->resolution_notes.size());
+                ImGui::TextColored(pal.warning, "%s", app::trf("dff.diagnostics", {
+                    {"count", std::to_string(m.warnings.size() + session_->resolution_notes.size())}
+                }).c_str());
                 if (fonts.semibold) ImGui::PopFont();
                 ImGui::Separator();
                 for (const auto& w : m.warnings) {

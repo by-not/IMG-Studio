@@ -23,5 +23,6 @@ struct SystemPaths {
 [[nodiscard]] std::filesystem::path resolve_asset_path(const std::string& relative_path);
 [[nodiscard]] bool reveal_in_file_manager(const std::filesystem::path& path);
 [[nodiscard]] bool open_directory_in_file_manager(const std::filesystem::path& dir);
+[[nodiscard]] std::string detect_system_language();
 
 } // namespace imgstudio::platform

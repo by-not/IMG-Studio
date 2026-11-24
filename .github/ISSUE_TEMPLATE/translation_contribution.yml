@@ -1,0 +1,41 @@
+name: Translation Contribution
+description: Submit or improve an IMG Studio language localization file
+title: "[Translation]: <Language Name> (<code>)"
+labels: ["localization"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping translate IMG Studio! Please read [docs/LOCALIZATION.md](docs/LOCALIZATION.md) first.
+  - type: input
+    id: language
+    attributes:
+      label: Language & ISO Code
+      placeholder: "e.g. Portuguese (pt) or German (de)"
+    validations:
+      required: true
+  - type: input
+    id: target_version
+    attributes:
+      label: Base Locale Version
+      placeholder: "e.g. 2.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / Untranslated Terms / UI Layout Observations
+      description: Mention any long strings that clip in menus/buttons or terminology questions
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Validation Checklist
+      options:
+        - label: File is saved as UTF-8 without BOM based on assets/locales/template.json
+          required: true
+        - label: "`python3 scripts/validate_locales.py` passes with 0 errors"
+          required: true
+        - label: All `{placeholder}` tokens match `en.json` without renaming or removing placeholders
+          required: true
+        - label: Tested live in IMG Studio via Settings -> Language or `--lang <code>`
+          required: false

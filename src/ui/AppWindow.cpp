@@ -1,5 +1,6 @@
 #include "ui/AppWindow.hpp"
 #include "app/ArchiveController.hpp"
+#include "app/Localization.hpp"
 #include "core/ImgFilename.hpp"
 #include "platform/Platform.hpp"
 #include "platform/WindowChrome.hpp"
@@ -60,8 +61,8 @@ void glfw_drop_callback(GLFWwindow* window, int path_count, const char* paths[])
             trigger_import_files(*ctx->controller, *ctx->state, asset_files);
         } else {
             ctx->state->push_toast(
-                "No archive open",
-                "Open a .img archive before dropping files to import.",
+                app::tr("toast.no_archive_open"),
+                app::tr("toast.drop_need_img"),
                 true);
         }
     }
@@ -106,6 +107,10 @@ void write_smoke_report(
         out << "txd_loaded_textures=" << modules.txd_studio.dictionary()->textures.size() << "\n";
     }
     out << "gl_error=" << static_cast<unsigned>(last_gl_err) << "\n";
+    out << "locale=" << app::Localization::instance().current_language() << "\n";
+    out << "requested_locale=" << app::Localization::instance().requested_language() << "\n";
+    out << "sample_explorer=" << app::tr("workspace.explorer") << "\n";
+    out << "sample_settings=" << app::tr("modal.settings.title") << "\n";
     out << "fonts=" << font_summary << "\n";
     out << "open_tabs=" << controller.tabs().size() << "\n";
     if (const auto* doc = controller.active_document()) {
@@ -152,7 +157,21 @@ int run_application(const AppLaunchOptions& options) {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.IniFilename = nullptr;
 
-    app::ArchiveController controller;
+    app::ArchiveController controller(options.settings_file_override);
+    (void)app::Localization::instance().load_from_directory(platform::resolve_asset_path("locales"));
+    if (options.initial_language.has_value()) {
+        app::Localization::instance().set_language(*options.initial_language);
+        if (options.save_language_override) {
+            controller.settings().language = *options.initial_language;
+            controller.save_settings();
+        }
+    } else {
+        app::Localization::instance().set_language(controller.settings().language);
+    }
+
+    std::string last_window_lang = app::Localization::instance().current_language();
+    glfwSetWindowTitle(window, app::tr_c("app.window_title"));
+
     UiState ui_state;
     StudioModules modules;
 
@@ -173,7 +192,7 @@ int run_application(const AppLaunchOptions& options) {
     if (options.initial_archive.has_value()) {
         auto open_res = controller.open_archive_sync(*options.initial_archive);
         if (!open_res.ok()) {
-            ui_state.push_toast("Failed to open archive", open_res.error->message, true);
+            ui_state.push_toast(app::tr("toast.open_failed"), open_res.error->message, true);
         } else if (options.smoke_test) {
             // Auto-load first DFF and TXD found inside archive during smoke test if not specified externally
             const auto* doc = controller.active_document();
@@ -198,14 +217,14 @@ int run_application(const AppLaunchOptions& options) {
 
     if (options.initial_dff.has_value()) {
         if (!modules.dff_studio.open_file_sync(*options.initial_dff)) {
-            ui_state.push_toast("Failed to open DFF", platform::to_utf8(*options.initial_dff), true);
+            ui_state.push_toast(app::tr("toast.dff_open_failed"), platform::to_utf8(*options.initial_dff), true);
         } else {
             ui_state.active_workspace = WorkspaceTab::DffStudio;
         }
     }
     if (options.initial_txd.has_value()) {
         if (!modules.txd_studio.open_file_sync(*options.initial_txd)) {
-            ui_state.push_toast("Failed to open TXD", platform::to_utf8(*options.initial_txd), true);
+            ui_state.push_toast(app::tr("toast.txd_open_failed"), platform::to_utf8(*options.initial_txd), true);
         } else if (!options.initial_dff.has_value()) {
             ui_state.active_workspace = WorkspaceTab::TxdStudio;
         }
@@ -225,6 +244,12 @@ int run_application(const AppLaunchOptions& options) {
             }
         }
         glfwPollEvents();
+
+        const std::string cur_lang = app::Localization::instance().current_language();
+        if (cur_lang != last_window_lang) {
+            last_window_lang = cur_lang;
+            glfwSetWindowTitle(window, app::tr_c("app.window_title"));
+        }
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(IMGStudio
-    VERSION 2.0.0
+    VERSION 2.1.0
     DESCRIPTION "Modern GTA San Andreas IMG VER2, DFF and TXD Studio"
     LANGUAGES CXX C
 )
@@ -92,6 +92,7 @@ add_library(imgstudio_app STATIC
     src/app/AssetLoader.cpp
     src/app/CompareService.cpp
     src/app/BatchProcessor.cpp
+    src/app/Localization.cpp
 )
 target_include_directories(imgstudio_app PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(imgstudio_app PUBLIC
@@ -174,6 +175,7 @@ if(IMGSTUDIO_BUILD_TESTS)
         tests/test_dff_txd_integration.cpp
         tests/test_img_compare.cpp
         tests/test_batch_processor.cpp
+        tests/test_localization.cpp
     )
     target_include_directories(IMGStudioTests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -189,5 +191,11 @@ if(IMGSTUDIO_BUILD_TESTS)
     imgstudio_apply_warnings(IMGStudioTests)
     imgstudio_apply_sanitizers(IMGStudioTests)
     imgstudio_apply_win32_static_runtime(IMGStudioTests)
+    add_custom_command(TARGET IMGStudioTests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/locales"
+            "$<TARGET_FILE_DIR:IMGStudioTests>/assets/locales"
+        COMMENT "Copying IMGStudio locale files to test output directory"
+    )
     add_test(NAME IMGStudioTests COMMAND IMGStudioTests)
 endif()

@@ -49,6 +49,30 @@ bool open_directory_in_file_manager(const std::filesystem::path& /*dir*/) {
     return false;
 }
 
+std::string detect_system_language() {
+    for (const char* env_var : {"LC_ALL", "LC_MESSAGES", "LANG"}) {
+        const char* val = std::getenv(env_var);
+        if (val && *val) {
+            std::string code;
+            for (const char* p = val; *p; ++p) {
+                const char ch = *p;
+                if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
+                    code.push_back((ch >= 'A' && ch <= 'Z') ? static_cast<char>(ch + ('a' - 'A')) : ch);
+                    if (code.size() == 2U) {
+                        if (code == "c." || code == "po") {
+                            break;
+                        }
+                        return code;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    return "en";
+}
+
 std::optional<std::filesystem::path> open_file_dialog(
     void* /*native_window_handle*/,
     const std::string& /*title*/,

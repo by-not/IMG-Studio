@@ -200,6 +200,25 @@ bool open_directory_in_file_manager(const std::filesystem::path& dir) {
     return reinterpret_cast<std::intptr_t>(res) > 32;
 }
 
+std::string detect_system_language() {
+    wchar_t locale_name[LOCALE_NAME_MAX_LENGTH]{};
+    if (GetUserDefaultLocaleName(locale_name, LOCALE_NAME_MAX_LENGTH) > 0) {
+        const std::string utf8 = wide_to_utf8(locale_name);
+        std::string code;
+        for (char ch : utf8) {
+            if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
+                code.push_back((ch >= 'A' && ch <= 'Z') ? static_cast<char>(ch + ('a' - 'A')) : ch);
+                if (code.size() == 2U) {
+                    return code;
+                }
+            } else {
+                break;
+            }
+        }
+    }
+    return "en";
+}
+
 std::optional<std::filesystem::path> open_file_dialog(
     void* native_window_handle,
     const std::string& title,

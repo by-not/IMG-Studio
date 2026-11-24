@@ -100,6 +100,12 @@ AppSettings AppSettingsStore::load_or_default(const std::filesystem::path& setti
                 }
             }
         }
+        if (j.contains("language") && j["language"].is_string()) {
+            const auto lang = j["language"].get<std::string>();
+            if (!lang.empty()) {
+                s.language = lang;
+            }
+        }
     } catch (...) {
         // Return clean defaults if settings file is corrupted
         return AppSettings{
@@ -114,7 +120,8 @@ AppSettings AppSettingsStore::load_or_default(const std::filesystem::path& setti
             true,
             true,
             {},
-            15U
+            15U,
+            "auto"
         };
     }
 
@@ -144,6 +151,7 @@ core::Result<void> AppSettingsStore::save(
     j["inspector_width"] = settings.inspector_width;
     j["show_sidebar"] = settings.show_sidebar;
     j["show_inspector"] = settings.show_inspector;
+    j["language"] = settings.language;
 
     nlohmann::json recent = nlohmann::json::array();
     for (const auto& p : settings.recent_files) {

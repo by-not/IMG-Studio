@@ -1,0 +1,45 @@
+name: Feature Request
+description: Propose an improvement or new capability for IMG Studio
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Note: IMG Studio currently targets **GTA San Andreas IMG VER2**, RenderWare DFF, and RenderWare TXD assets.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Target Module
+      options:
+        - Archive Explorer
+        - DFF Studio
+        - TXD Studio
+        - IMG Compare
+        - Batch Processing
+        - CLI / Automation
+        - Localization / Accessibility
+        - Architecture / Core Engine
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What workflow or limitation does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the UI, CLI, or engine behavior you would like to see
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Scope & Verification
+      options:
+        - label: I checked existing documentation (README, ROADMAP, docs/FORMATS.md) to see if this is already covered or planned.
+          required: true
