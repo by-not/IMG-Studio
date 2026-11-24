@@ -399,6 +399,15 @@ void render_explorer_table(
                     state.anchor_visible_row = static_cast<std::size_t>(row);
                 }
             }
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !controller.is_busy()) {
+                if (entry.category == core::FileCategory::DffModel) {
+                    state.pending_preview_dff_entry_id = entry.id;
+                    state.active_workspace = WorkspaceTab::DffStudio;
+                } else if (entry.category == core::FileCategory::TxdTexture) {
+                    state.pending_preview_txd_entry_id = entry.id;
+                    state.active_workspace = WorkspaceTab::TxdStudio;
+                }
+            }
 
             if (ImGui::BeginPopupContextItem("EntryContextMenu")) {
                 if (!is_selected) {
@@ -407,6 +416,19 @@ void render_explorer_table(
                     state.primary_selected_id = entry.id;
                 }
                 const bool busy = controller.is_busy();
+                if (entry.category == core::FileCategory::DffModel) {
+                    if (ImGui::MenuItem("Preview in DFF Studio", nullptr, false, !busy)) {
+                        state.pending_preview_dff_entry_id = entry.id;
+                        state.active_workspace = WorkspaceTab::DffStudio;
+                    }
+                    ImGui::Separator();
+                } else if (entry.category == core::FileCategory::TxdTexture) {
+                    if (ImGui::MenuItem("Preview in TXD Studio", nullptr, false, !busy)) {
+                        state.pending_preview_txd_entry_id = entry.id;
+                        state.active_workspace = WorkspaceTab::TxdStudio;
+                    }
+                    ImGui::Separator();
+                }
                 if (ImGui::MenuItem("Export Selected...", "Ctrl+E", false, !busy)) {
                     trigger_export_entries(controller, state, native_hwnd, false);
                 }

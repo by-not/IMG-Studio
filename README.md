@@ -1,53 +1,37 @@
-# IMG Studio
+# IMG Studio 2.0
 
-IMG Studio es una aplicacion de escritorio nativa para Windows x64 (Windows 10 y Windows 11) diseñada para inspeccionar, validar, modificar y reconstruir archivos **IMG VER2 de GTA San Andreas**.
+IMG Studio es una aplicacion de escritorio nativa para Windows x64 (Windows 10 y Windows 11) diseñada para gestionar archivos **IMG VER2 de GTA San Andreas**, visualizar modelos **3D RenderWare DFF**, inspeccionar y exportar diccionarios de texturas **TXD**, comparar archivos IMG y ejecutar operaciones por lotes.
 
-Esta desarrollada desde cero en C++20 con separacion estricta entre el motor binario, los servicios de plataforma y la interfaz grafica moderna en modo oscuro (Dear ImGui + GLFW + OpenGL 3.3). No reutiliza codigo ni ingenieria inversa de herramientas heredadas como Alci's IMG Editor.
+Esta desarrollada en C++20 desde cero con separacion estricta entre el motor binario, los servicios de aplicacion, el renderizador OpenGL 3.3 Core y la interfaz grafica moderna en modo oscuro (Dear ImGui + GLFW). No reutiliza codigo ni ingenieria inversa de herramientas heredadas.
 
-## Caracteristicas principales
+## Novedades principales en 2.0.0
 
-- **Motor binario IMG VER2 independiente**: lectura por streaming con analisis little-endian explicito de la cabecera de 8 bytes (`VER2` + contador de entradas) y entradas de directorio de 32 bytes (`offset_sectors`, `streaming_size`, `archive_size`, `raw_name` de 24 bytes), alineacion estricta a sectores de 2048 bytes y aritmetica verificada contra desbordamientos.
-- **Preservacion de metadatos**: conserva `streaming_size`, `archive_size` y los 24 bytes crudos de nombre en entradas no modificadas, distinguiendo ambos campos de tamaño.
-- **Reconstruccion segura y atomica**: nunca sobrescribe el archivo original en sitio. Escribe el archivo reconstruido en un temporal, verifica estructura + hashes SHA-256 de todos los payloads escritos y ejecuta reemplazo atomico Win32 (`ReplaceFileW` / `MoveFileExW` con `FlushFileBuffers`).
-- **Respaldos automaticos y manuales**: crea copias de seguridad verificadas por SHA-256 antes de cada reconstruccion confirmada (configurable), mantiene un indice historico (`backups_index.json`) e incluye restauracion segura e instrucciones de recuperacion manual.
-- **Validacion y diagnostico**: detecta firmas invalidas, cabeceras/directorios truncados, desbordamientos, entradas fuera de limites, solapamientos con directorio o entre entradas, nombres invalidos o sin terminador nulo, duplicados insensibles a mayusculas, metadatos de tamaño inusuales y errores de lectura de payloads.
-- **Interfaz moderna y fluida**: soporte multi-pestaña, tabla virtualizada con ordenacion por columnas, busqueda instantanea, filtros por tipo y extension, seleccion multiple, arrastrar y soltar desde el Explorador de Windows, historial Undo/Redo previo al commit, inspector de propiedades/validacion/respaldos y dialogos nativos de Windows.
+- **DFF Studio (visor 3D integrado)**: carga archivos `.dff` externos o directamente desde un archivo `.img` abierto; soporta modos *Textured*, *Solid*, *Wireframe* y *Material Colors*, camara orbital con pan/zoom/fit/reset, rejilla XY, ejes Z-up, fondo e iluminacion configurables, inspector completo de geometrias/materiales/bounds y diagnosticos claros para variantes no soportadas.
+- **TXD Studio (visor de texturas)**: abre `.txd` externos o entradas dentro de un `.img`; decodifica en C++20 puro formatos PC D3D9/D3D8 (`DXT1`, `DXT3`, `DXT5`, `RASTER_8888`, `RASTER_888`, `1555`, `555`, `565`, `4444`, `LUM8`, `PAL8`, `PAL4`), muestra cuadricula de miniaturas, inspeccion de mipmaps, canales `RGBA`/`RGB`/`Alpha`, fondo tablero/oscuro/claro, filtro `Linear`/`Nearest`, zoom y exportacion a `PNG`, `TGA` o `BMP`.
+- **Integracion DFF + TXD**: al abrir un `.dff` desde un `.img` o disco, resuelve automaticamente sus referencias de textura contra `<nombre>.txd`, `vehicle.txd`, `generic.txd` o diccionarios TXD cargados manualmente, sin extraer archivos temporales a disco.
+- **IMG Compare**: compara dos archivos `.img` mediante SHA-256 por streaming sin cargar archivos completos en memoria, clasificando diferencias en *Unchanged*, *Added*, *Removed*, *Modified*, *Metadata Diff* y *Ambiguous*, con exportacion JSON/TXT.
+- **Batch Processing**: cola concurrente (1 a 4 hilos aislados por archivo) para validar, respaldar, exportar todo, importar archivos o reemplazar entradas coincidentes en multiples `.img`, con respaldos automaticos y reporte JSON.
+- **Estabilidad 1.0.0 conservada**: todas las operaciones seguras de lectura, validacion, extraccion, edicion staged con Undo/Redo, reconstruccion verificada con SHA-256 y respaldos automaticos permanecen intactas.
 
 ## Requisitos (Windows)
 
 - Windows 10 o Windows 11 (x64).
 - Adaptador grafico compatible con OpenGL 3.3 Core Profile.
-- No requiere instalar redistribuibles externos de MinGW ni Visual C++ (el runtime C++/pthread se enlaza estaticamente).
+- Sin dependencias de runtime externas de MinGW ni Visual C++.
 
 ## Uso rapido
 
-1. Extrae el paquete ZIP `IMGStudio-1.0.0-win64.zip` manteniendo la carpeta `assets/` junto a `IMGStudio.exe`.
-2. Ejecuta `IMGStudio.exe` (o pasa una ruta `.img` por linea de comandos / arrastrandola sobre la ventana).
-3. Realiza importaciones, reemplazos, renombrados o eliminaciones en memoria (puedes usar `Ctrl+Z` / `Ctrl+Y` o descartar cambios).
-4. Pulsa **Rebuild & Save** (`Ctrl+S`) para crear el respaldo automatico, reconstruir, verificar con SHA-256 y confirmar en disco.
+1. Extrae `IMGStudio-2.0.0-win64.zip` manteniendo la carpeta `assets/` junto a `IMGStudio.exe`.
+2. Ejecuta `IMGStudio.exe` (opcionalmente pasando `<archivo.img>`, `--dff <modelo.dff>` o `--txd <diccionario.txd>`).
+3. Cambia entre los 5 espacios de trabajo desde la barra superior: **Archive Explorer**, **DFF Studio**, **TXD Studio**, **IMG Compare** y **Batch Processing**.
+4. Haz doble clic o clic derecho sobre una entrada `.dff` o `.txd` en **Archive Explorer** para abrirla directamente en su estudio sin extraerla a disco.
 
-## Atajos de teclado principales
+## Documentacion tecnica
 
-| Atajo | Accion |
-| --- | --- |
-| `Ctrl+O` | Abrir archivo `.img` |
-| `Ctrl+N` | Crear nuevo archivo `.img` VER2 vacio |
-| `Ctrl+S` | Reconstruir y guardar cambios pendientes |
-| `Ctrl+W` | Cerrar pestaña activa |
-| `Ctrl+I` | Importar archivos al archivo activo |
-| `Ctrl+E` | Exportar entradas seleccionadas |
-| `Ctrl+F` | Enfocar cuadro de busqueda |
-| `Ctrl+A` | Seleccionar todas las entradas visibles |
-| `Ctrl+Z` / `Ctrl+Y` | Deshacer / Rehacer cambio pendiente |
-| `F2` | Renombrar entrada seleccionada |
-| `Supr` | Marcar seleccion para eliminar |
-| `F5` | Validar estructura del archivo activo |
-
-## Documentacion del proyecto
-
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Arquitectura por capas, concurrencia y flujo de commit seguro.
-- [IMG_FORMAT.md](IMG_FORMAT.md) — Especificacion VER2 documentada y decisiones de implementacion.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Arquitectura modular en 4 capas y concurrencia segura.
+- [IMG_FORMAT.md](IMG_FORMAT.md) — Especificacion IMG VER2 de GTA San Andreas.
+- [DFF_FORMAT.md](DFF_FORMAT.md) — Chunks RenderWare DFF soportados y limitaciones.
+- [TXD_FORMAT.md](TXD_FORMAT.md) — Formatos TXD, decodificadores DXT/PAL/RGBA y exportacion.
 - [BUILDING.md](BUILDING.md) — Compilacion cruzada desde WSL2 Debian, presets y empaquetado.
-- [TESTING.md](TESTING.md) — Suite de pruebas automatizadas, sanitizers y verificacion en Windows.
-- [ROADMAP.md](ROADMAP.md) — Alcance de la version 1.0.0 y lineas futuras.
-- [CHANGELOG.md](CHANGELOG.md) — Historial de versiones.
+- [TESTING.md](TESTING.md) — Pruebas automatizadas, sanitizers y verificacion Windows.
+- [ROADMAP.md](ROADMAP.md) y [CHANGELOG.md](CHANGELOG.md).
