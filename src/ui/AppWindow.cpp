@@ -3,6 +3,7 @@
 #include "core/ImgFilename.hpp"
 #include "platform/Platform.hpp"
 #include "platform/WindowChrome.hpp"
+#include "render/GlLoader.hpp"
 #include "ui/ExplorerTable.hpp"
 #include "ui/MainView.hpp"
 #include "ui/Theme.hpp"
@@ -52,6 +53,7 @@ void glfw_drop_callback(GLFWwindow* window, int path_count, const char* paths[])
 
     if (!img_files.empty() && !ctx->controller->is_busy()) {
         ctx->controller->start_open_archive(img_files.front());
+        ctx->state->active_workspace = WorkspaceTab::ArchiveExplorer;
     }
     if (!asset_files.empty()) {
         if (ctx->controller->active_document()) {
@@ -72,7 +74,9 @@ void write_smoke_report(
     const std::string& gl_renderer,
     const std::string& gl_version,
     const std::string& font_summary,
-    const app::ArchiveController& controller) {
+    const app::ArchiveController& controller,
+    const StudioModules& modules,
+    GLenum last_gl_err) {
     if (!options.smoke_test_report_path.has_value()) {
         return;
     }
@@ -84,6 +88,24 @@ void write_smoke_report(
     out << "gl_vendor=" << gl_vendor << "\n";
     out << "gl_renderer=" << gl_renderer << "\n";
     out << "gl_version=" << gl_version << "\n";
+    out << "gl_loader_ok=" << (render::gl::is_gl_ready() ? 1 : 0) << "\n";
+    out << "dff_renderer_ok=" << (modules.dff_studio.renderer().is_initialized() ? 1 : 0) << "\n";
+    out << "dff_fbo_ok=" << (modules.dff_studio.renderer().fbo_valid() ? 1 : 0) << "\n";
+    out << "dff_has_model=" << (modules.dff_studio.renderer().has_model() ? 1 : 0) << "\n";
+    if (modules.dff_studio.session().has_value()) {
+        const auto& s = *modules.dff_studio.session();
+        std::size_t resolved_cnt = 0;
+        for (const auto& [k, v] : s.resolved_textures) {
+            if (v.resolved) ++resolved_cnt;
+        }
+        out << "dff_vertices=" << s.model.total_vertices << "\n";
+        out << "dff_triangles=" << s.model.total_triangles << "\n";
+        out << "dff_resolved_textures=" << resolved_cnt << "\n";
+    }
+    if (modules.txd_studio.dictionary() != nullptr) {
+        out << "txd_loaded_textures=" << modules.txd_studio.dictionary()->textures.size() << "\n";
+    }
+    out << "gl_error=" << static_cast<unsigned>(last_gl_err) << "\n";
     out << "fonts=" << font_summary << "\n";
     out << "open_tabs=" << controller.tabs().size() << "\n";
     if (const auto* doc = controller.active_document()) {
@@ -108,13 +130,13 @@ int run_application(const AppLaunchOptions& options) {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     }
 
-    GLFWwindow* window = glfwCreateWindow(1360, 840, "IMG Studio — GTA San Andreas IMG VER2", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(1400, 860, "IMG Studio 2.0 — GTA San Andreas Asset & Archive Studio", nullptr, nullptr);
     if (!window) {
         glfwTerminate();
         return 3;
     }
 
-    glfwSetWindowSizeLimits(window, 960, 620, GLFW_DONT_CARE, GLFW_DONT_CARE);
+    glfwSetWindowSizeLimits(window, 1024, 640, GLFW_DONT_CARE, GLFW_DONT_CARE);
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 
@@ -128,10 +150,11 @@ int run_application(const AppLaunchOptions& options) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.IniFilename = nullptr; // Avoid polluting working directories with imgui.ini
+    io.IniFilename = nullptr;
 
     app::ArchiveController controller;
     UiState ui_state;
+    StudioModules modules;
 
     float xscale = 1.0f;
     float yscale = 1.0f;
@@ -141,6 +164,7 @@ int run_application(const AppLaunchOptions& options) {
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
+    (void)render::gl::init_gl_functions();
 
     DropDispatchContext drop_ctx{&controller, &ui_state};
     glfwSetWindowUserPointer(window, &drop_ctx);
@@ -150,6 +174,40 @@ int run_application(const AppLaunchOptions& options) {
         auto open_res = controller.open_archive_sync(*options.initial_archive);
         if (!open_res.ok()) {
             ui_state.push_toast("Failed to open archive", open_res.error->message, true);
+        } else if (options.smoke_test) {
+            // Auto-load first DFF and TXD found inside archive during smoke test if not specified externally
+            const auto* doc = controller.active_document();
+            if (doc && !options.initial_dff.has_value()) {
+                for (const auto& e : doc->entries()) {
+                    if (e.category == core::FileCategory::DffModel) {
+                        modules.dff_studio.open_from_document_sync(*doc, e.id);
+                        break;
+                    }
+                }
+            }
+            if (doc && !options.initial_txd.has_value()) {
+                for (const auto& e : doc->entries()) {
+                    if (e.category == core::FileCategory::TxdTexture) {
+                        modules.txd_studio.open_from_document_sync(*doc, e.id);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (options.initial_dff.has_value()) {
+        if (!modules.dff_studio.open_file_sync(*options.initial_dff)) {
+            ui_state.push_toast("Failed to open DFF", platform::to_utf8(*options.initial_dff), true);
+        } else {
+            ui_state.active_workspace = WorkspaceTab::DffStudio;
+        }
+    }
+    if (options.initial_txd.has_value()) {
+        if (!modules.txd_studio.open_file_sync(*options.initial_txd)) {
+            ui_state.push_toast("Failed to open TXD", platform::to_utf8(*options.initial_txd), true);
+        } else if (!options.initial_dff.has_value()) {
+            ui_state.active_workspace = WorkspaceTab::TxdStudio;
         }
     }
 
@@ -172,7 +230,11 @@ int run_application(const AppLaunchOptions& options) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        render_main_view(controller, ui_state, native_hwnd, fonts, request_window_close);
+        render_main_view(controller, ui_state, modules, native_hwnd, fonts, request_window_close);
+
+        if (options.smoke_test) {
+            modules.dff_studio.render_smoke_frame(640, 480);
+        }
 
         ImGui::Render();
         int fb_w = 0;
@@ -190,6 +252,7 @@ int run_application(const AppLaunchOptions& options) {
             const char* vendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
             const char* renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
             const char* glver = reinterpret_cast<const char*>(glGetString(GL_VERSION));
+            const GLenum gl_err = glGetError();
             write_smoke_report(
                 options,
                 "SMOKE_TEST_OK",
@@ -197,11 +260,14 @@ int run_application(const AppLaunchOptions& options) {
                 renderer ? renderer : "unknown",
                 glver ? glver : "unknown",
                 fonts.loaded_summary,
-                controller);
+                controller,
+                modules,
+                gl_err);
             break;
         }
     }
 
+    modules.shutdown();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

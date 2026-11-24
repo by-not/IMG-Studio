@@ -260,6 +260,7 @@ void render_empty_state(app::ArchiveController& controller, void* native_hwnd, c
 void render_main_view(
     app::ArchiveController& controller,
     UiState& state,
+    StudioModules& modules,
     void* native_hwnd,
     const FontBundle& fonts,
     bool& request_window_close) {
@@ -405,10 +406,20 @@ void render_main_view(
             if (ImGui::MenuItem("Open Backups Folder")) {
                 (void)platform::open_directory_in_file_manager(controller.backup_manager().backup_directory());
             }
+            if (doc != nullptr && ImGui::MenuItem("Send Active Archive to IMG Compare")) {
+                state.pending_compare_archive_a = doc->path();
+                state.active_workspace = WorkspaceTab::ImgCompare;
+            }
             ImGui::EndMenu();
         }
 
         if (ImGui::BeginMenu("View")) {
+            if (ImGui::MenuItem("Archive Explorer")) state.active_workspace = WorkspaceTab::ArchiveExplorer;
+            if (ImGui::MenuItem("DFF Studio")) state.active_workspace = WorkspaceTab::DffStudio;
+            if (ImGui::MenuItem("TXD Studio")) state.active_workspace = WorkspaceTab::TxdStudio;
+            if (ImGui::MenuItem("IMG Compare")) state.active_workspace = WorkspaceTab::ImgCompare;
+            if (ImGui::MenuItem("Batch Processing")) state.active_workspace = WorkspaceTab::BatchProcessing;
+            ImGui::Separator();
             if (ImGui::MenuItem("Show Sidebar", nullptr, controller.settings().show_sidebar)) {
                 controller.settings().show_sidebar = !controller.settings().show_sidebar;
                 controller.save_settings();
@@ -427,6 +438,64 @@ void render_main_view(
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();
+    }
+
+    // 1b. Unified Workspace Navigation Bar (v2.0)
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, pal.bg_header);
+    ImGui::BeginChild("##WorkspaceSwitcher", ImVec2(0.0f, 38.0f), true, ImGuiWindowFlags_NoScrollbar);
+    {
+        struct WsItem {
+            const char* label;
+            WorkspaceTab tab;
+        };
+        const WsItem ws_items[] = {
+            {"Archive Explorer", WorkspaceTab::ArchiveExplorer},
+            {"DFF Studio", WorkspaceTab::DffStudio},
+            {"TXD Studio", WorkspaceTab::TxdStudio},
+            {"IMG Compare", WorkspaceTab::ImgCompare},
+            {"Batch Processing", WorkspaceTab::BatchProcessing},
+        };
+        for (int wi = 0; wi < 5; ++wi) {
+            if (wi > 0) ImGui::SameLine();
+            const bool active = (state.active_workspace == ws_items[wi].tab);
+            if (active) {
+                ImGui::PushStyleColor(ImGuiCol_Button, pal.accent);
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, pal.accent_hover);
+            }
+            if (ImGui::Button(ws_items[wi].label, ImVec2(148.0f, 0.0f))) {
+                state.active_workspace = ws_items[wi].tab;
+            }
+            if (active) {
+                ImGui::PopStyleColor(2);
+            }
+        }
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+
+    if (state.active_workspace == WorkspaceTab::DffStudio) {
+        modules.dff_studio.render(controller, state, native_hwnd, fonts);
+        render_modals_and_toasts(controller, state, native_hwnd, request_window_close);
+        ImGui::End();
+        return;
+    }
+    if (state.active_workspace == WorkspaceTab::TxdStudio) {
+        modules.txd_studio.render(controller, state, native_hwnd, fonts);
+        render_modals_and_toasts(controller, state, native_hwnd, request_window_close);
+        ImGui::End();
+        return;
+    }
+    if (state.active_workspace == WorkspaceTab::ImgCompare) {
+        modules.img_compare.render(controller, state, native_hwnd, fonts);
+        render_modals_and_toasts(controller, state, native_hwnd, request_window_close);
+        ImGui::End();
+        return;
+    }
+    if (state.active_workspace == WorkspaceTab::BatchProcessing) {
+        modules.batch_view.render(controller, state, native_hwnd, fonts);
+        render_modals_and_toasts(controller, state, native_hwnd, request_window_close);
+        ImGui::End();
+        return;
     }
 
     // 2. Main Toolbar

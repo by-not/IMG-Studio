@@ -21,6 +21,10 @@ int run_cli_main(int argc, char** argv) {
             opts.smoke_test = true;
         } else if (arg == "--open" && i + 1 < argc) {
             opts.initial_archive = imgstudio::platform::from_utf8(argv[++i]);
+        } else if (arg == "--dff" && i + 1 < argc) {
+            opts.initial_dff = imgstudio::platform::from_utf8(argv[++i]);
+        } else if (arg == "--txd" && i + 1 < argc) {
+            opts.initial_txd = imgstudio::platform::from_utf8(argv[++i]);
         } else if (arg == "--smoke-test-out" && i + 1 < argc) {
             opts.smoke_test_report_path = imgstudio::platform::from_utf8(argv[++i]);
         } else if (!arg.empty() && arg[0] != '-' && !opts.initial_archive.has_value()) {

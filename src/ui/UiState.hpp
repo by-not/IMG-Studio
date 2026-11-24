@@ -13,7 +13,20 @@
 
 namespace imgstudio::ui {
 
+enum class WorkspaceTab : std::uint8_t {
+    ArchiveExplorer = 0,
+    DffStudio,
+    TxdStudio,
+    ImgCompare,
+    BatchProcessing
+};
+
 struct UiState {
+    WorkspaceTab active_workspace = WorkspaceTab::ArchiveExplorer;
+    std::optional<std::uint64_t> pending_preview_dff_entry_id;
+    std::optional<std::uint64_t> pending_preview_txd_entry_id;
+    std::optional<std::filesystem::path> pending_compare_archive_a;
+
     // Filtering & sorting
     app::EntryFilterCriteria filter{};
     std::vector<std::size_t> visible_indices;

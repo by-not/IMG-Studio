@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(IMGStudio
-    VERSION 1.0.0
-    DESCRIPTION "Modern GTA San Andreas IMG VER2 Archive Studio"
+    VERSION 2.0.0
+    DESCRIPTION "Modern GTA San Andreas IMG VER2, DFF and TXD Studio"
     LANGUAGES CXX C
 )
 
@@ -42,7 +42,7 @@ function(imgstudio_apply_win32_static_runtime target_name)
     endif()
 endfunction()
 
-# Core IMG VER2 engine (pure C++20, zero UI/Win32 dependencies)
+# Core IMG VER2 + RenderWare binary engine (pure C++20, zero UI/Win32 dependencies)
 add_library(imgstudio_core STATIC
     src/core/BinaryIO.cpp
     src/core/ImgFilename.cpp
@@ -51,8 +51,17 @@ add_library(imgstudio_core STATIC
     src/core/ImgValidator.cpp
     src/core/ImgExtractor.cpp
     src/core/ImgBuilder.cpp
+    src/core/ImgCompare.cpp
+    src/core/rw/RwStream.cpp
+    src/core/rw/DffParser.cpp
+    src/core/rw/TxdDecoder.cpp
+    src/core/rw/TxdParser.cpp
+    src/core/rw/ImageExporter.cpp
 )
-target_include_directories(imgstudio_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_include_directories(imgstudio_core PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/stb"
+)
 imgstudio_apply_warnings(imgstudio_core)
 imgstudio_apply_sanitizers(imgstudio_core)
 
@@ -80,6 +89,9 @@ add_library(imgstudio_app STATIC
     src/app/EntryFilter.cpp
     src/app/ArchiveDocument.cpp
     src/app/ArchiveController.cpp
+    src/app/AssetLoader.cpp
+    src/app/CompareService.cpp
+    src/app/BatchProcessor.cpp
 )
 target_include_directories(imgstudio_app PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(imgstudio_app PUBLIC
@@ -94,12 +106,20 @@ imgstudio_apply_sanitizers(imgstudio_app)
 if(IMGSTUDIO_BUILD_GUI)
     set(_gui_sources
         src/main.cpp
+        src/render/GlLoader.cpp
+        src/render/GpuTexture.cpp
+        src/render/ViewportFbo.cpp
+        src/render/DffRenderer.cpp
         src/ui/Theme.cpp
         src/ui/AppWindow.cpp
         src/ui/MainView.cpp
         src/ui/ExplorerTable.cpp
         src/ui/InspectorPanel.cpp
         src/ui/Dialogs.cpp
+        src/ui/DffStudioView.cpp
+        src/ui/TxdStudioView.cpp
+        src/ui/ImgCompareView.cpp
+        src/ui/BatchView.cpp
     )
     if(WIN32)
         list(APPEND _gui_sources src/platform/windows/resources.rc)
@@ -138,6 +158,7 @@ if(IMGSTUDIO_BUILD_TESTS)
     enable_testing()
     add_executable(IMGStudioTests
         tests/TestHelpers.cpp
+        tests/RwTestHelpers.cpp
         tests/test_binary_io.cpp
         tests/test_img_reader.cpp
         tests/test_img_validator.cpp
@@ -148,6 +169,11 @@ if(IMGSTUDIO_BUILD_TESTS)
         tests/test_backup_manager.cpp
         tests/test_app_settings.cpp
         tests/test_entry_filter.cpp
+        tests/test_dff_parser.cpp
+        tests/test_txd_parser.cpp
+        tests/test_dff_txd_integration.cpp
+        tests/test_img_compare.cpp
+        tests/test_batch_processor.cpp
     )
     target_include_directories(IMGStudioTests PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"

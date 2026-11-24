@@ -255,12 +255,12 @@ void render_modals_and_toasts(
     // 6. About modal
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (ImGui::BeginPopupModal("About IMG Studio", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::Text("IMG Studio v1.0.0 (Windows x64)");
+        ImGui::Text("IMG Studio v2.0.0 (Windows x64)");
         ImGui::Separator();
         ImGui::TextWrapped(
-            "Independent GTA San Andreas IMG VER2 archive manager built with C++20, "
-            "Dear ImGui, GLFW and OpenGL 3.3. Uses streaming I/O, atomic replacement, "
-            "SHA-256 verification and automatic pre-commit backups.");
+            "Independent GTA San Andreas IMG VER2, RenderWare DFF & TXD Studio built with C++20, "
+            "Dear ImGui, GLFW and OpenGL 3.3. Includes streaming archive engine, SHA-256 verification, "
+            "automatic backups, 3D DFF viewer, TXD texture inspector, IMG Compare and Batch Processing.");
         ImGui::Spacing();
         if (ImGui::Button("Close", ImVec2(100, 0))) {
             ImGui::CloseCurrentPopup();

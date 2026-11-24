@@ -7,8 +7,8 @@ IDI_APP_ICON ICON "../../../assets/icons/imgstudio.ico"
 1 RT_MANIFEST "app.manifest"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,0,0
- PRODUCTVERSION 1,0,0,0
+ FILEVERSION 2,0,0,0
+ PRODUCTVERSION 2,0,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -24,13 +24,13 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "IMG Studio Contributors"
-            VALUE "FileDescription", "IMG Studio - GTA San Andreas IMG VER2 Archive Manager"
-            VALUE "FileVersion", "1.0.0.0"
+            VALUE "FileDescription", "IMG Studio - GTA San Andreas IMG VER2, DFF and TXD Studio"
+            VALUE "FileVersion", "2.0.0.0"
             VALUE "InternalName", "IMGStudio"
             VALUE "LegalCopyright", "Copyright (c) 2026 IMG Studio Contributors (MIT)"
             VALUE "OriginalFilename", "IMGStudio.exe"
             VALUE "ProductName", "IMG Studio"
-            VALUE "ProductVersion", "1.0.0.0"
+            VALUE "ProductVersion", "2.0.0.0"
         END
     END
     BLOCK "VarFileInfo"
