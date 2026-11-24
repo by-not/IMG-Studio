@@ -1,0 +1,8 @@
+build/
+dist/
+.cache/
+*.user
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db

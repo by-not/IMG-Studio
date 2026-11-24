@@ -1,0 +1,94 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "win64-release",
+      "displayName": "Windows x64 Release (MinGW-w64)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/win64-release",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/mingw-w64-x86_64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "IMGSTUDIO_BUILD_GUI": "ON",
+        "IMGSTUDIO_BUILD_TESTS": "ON",
+        "IMGSTUDIO_ENABLE_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "win64-debug",
+      "displayName": "Windows x64 Debug (MinGW-w64)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/win64-debug",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/mingw-w64-x86_64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "IMGSTUDIO_BUILD_GUI": "ON",
+        "IMGSTUDIO_BUILD_TESTS": "ON",
+        "IMGSTUDIO_ENABLE_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "linux-debug-tests",
+      "displayName": "Linux Debug Tests (ASan + UBSan)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-debug-tests",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "IMGSTUDIO_BUILD_GUI": "OFF",
+        "IMGSTUDIO_BUILD_TESTS": "ON",
+        "IMGSTUDIO_ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
+      "name": "linux-release-tests",
+      "displayName": "Linux Release Tests",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-release-tests",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "IMGSTUDIO_BUILD_GUI": "OFF",
+        "IMGSTUDIO_BUILD_TESTS": "ON",
+        "IMGSTUDIO_ENABLE_SANITIZERS": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "win64-release",
+      "configurePreset": "win64-release"
+    },
+    {
+      "name": "win64-debug",
+      "configurePreset": "win64-debug"
+    },
+    {
+      "name": "linux-debug-tests",
+      "configurePreset": "linux-debug-tests"
+    },
+    {
+      "name": "linux-release-tests",
+      "configurePreset": "linux-release-tests"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "linux-debug-tests",
+      "configurePreset": "linux-debug-tests",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "linux-release-tests",
+      "configurePreset": "linux-release-tests",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
