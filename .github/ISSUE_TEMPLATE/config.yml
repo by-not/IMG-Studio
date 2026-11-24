@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Localization Guide
-    url: https://github.com/OWNER/IMGStudio/blob/develop/docs/LOCALIZATION.md
+    url: https://github.com/by-not/IMG-Studio/blob/main/docs/LOCALIZATION.md
     about: Read how to create or validate a new language pack before submitting a translation issue.
   - name: Security Policy
-    url: https://github.com/OWNER/IMGStudio/blob/develop/SECURITY.md
+    url: https://github.com/by-not/IMG-Studio/blob/main/SECURITY.md
     about: Follow our private vulnerability reporting process instead of opening public bug reports for security issues.
